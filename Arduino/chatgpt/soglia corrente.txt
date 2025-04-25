@@ -1,0 +1,92 @@
+/*
+Arduino NANO
+
+unsigned int ContaSecondi = 0;
+unsigned int ContaSecondiCorrenteElevata;
+
+unsigned int ContaEventiTrigger=0;
+char StrContaEventiTrigger[5]
+
+int intCurrent;
+int intSogliaMilliampere; 
+
+cosa fa lo sketch
+Ogni secondo (usando millis()):
+- prende il valore di intCurrent senza il segno
+- prende il valore di intSogliaMilliampere senza il segno
+
+- se intCurrent è < intSogliaMilliampere (tutti senza segno)
+  - Spegne il Tone
+  - Stacca il relay
+
+
+- se intCurrent è >= intSogliaMilliampere (tutti senza segno):
+  - Alimenta il relay
+  - Incrementa ContaSecondiCorrenteElevata
+	- Se ContaSecondi è pari 
+		Suona Tone
+	  Se ContaSecondi è dispari
+		Spegne il Tone
+		
+*/
+
+// Definizione delle variabili
+unsigned int ContaSecondi = 0;
+unsigned int ContaSecondiCorrenteElevata = 0;
+unsigned int ContaEventiTrigger = 0;
+char StrContaEventiTrigger[5];
+
+int intCurrent = 0;
+int intSogliaMilliampere = 1000; // Esempio di soglia, da impostare secondo necessità
+
+// Pin di connessione
+const int relayPin = 2; // Pin del relay
+const int tonePin = 3;  // Pin del buzzer
+
+unsigned long previousMillis = 0;
+const long interval = 1000; // Intervallo di 1 secondo
+
+void setup() {
+  pinMode(relayPin, OUTPUT);
+  pinMode(tonePin, OUTPUT);
+  Serial.begin(9600);
+}
+
+void loop() {
+  unsigned long currentMillis = millis();
+
+  // Ogni secondo
+  if (currentMillis - previousMillis >= interval) {
+    previousMillis = currentMillis;
+    ContaSecondi++;
+
+    // Simulazione lettura corrente (deve essere sostituita con la lettura effettiva)
+    intCurrent = analogRead(A0); // Esempio di lettura dal pin A0
+
+    // Controllo della corrente rispetto alla soglia
+    if (intCurrent < intSogliaMilliampere) {
+      // Se la corrente è inferiore alla soglia
+      digitalWrite(tonePin, LOW); // Spegne il Tone
+      digitalWrite(relayPin, LOW); // Stacca il relay
+    } else {
+      // Se la corrente è maggiore o uguale alla soglia
+      digitalWrite(relayPin, HIGH); // Alimenta il relay
+      ContaSecondiCorrenteElevata++;
+
+      if (ContaSecondi % 2 == 0) {
+        tone(tonePin, 1000); // Suona Tone (frequenza di esempio)
+      } else {
+        noTone(tonePin); // Spegne il Tone
+      }
+    }
+
+    // Debugging: stampa i valori
+    Serial.print("Current: ");
+    Serial.print(intCurrent);
+    Serial.print(" mA, Soglia: ");
+    Serial.print(intSogliaMilliampere);
+    Serial.print(" mA, ContaSecondi: ");
+    Serial.println(ContaSecondi);
+  }
+}
+   
