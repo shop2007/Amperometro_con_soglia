@@ -10,6 +10,8 @@ const String PrefissoInt = "+39";
 String NumeroUtente1;
 String NumeroUtente2;
 
+int ContaSMS = 1;
+
 String TestoSMS = "questo è il testo sms";
 
 // EEPROM offset (ogni numero max 15 caratteri)
