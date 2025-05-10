@@ -1,4 +1,4 @@
-String Versione = "amp-sogl-20_sms";
+String Versione = "amp-sogl-21_sms";
 /*
 = alla vers. amp-sogl-17 ma con librerie in locale nel progetto
 Per entrare nel menu scrivere "Menu" a 115200 baud
@@ -45,6 +45,7 @@ const int ValoreAdcSoglia0ampere = 0x0;     // Valore Adc Corrente 0 Ampere, da 
 unsigned int adcValue ; //  valore dall'ADC
 
 float currentSensor;
+bool UnSoloSms = false;
 
 
 
@@ -480,19 +481,39 @@ void ControllaSogliaSuperata() {
         Led_verde_on();
       }
 
-
-
-
-
+      if (!UnSoloSms){
+        //si manda sms solo la prima volta
+        UnSoloSms = true;
+        CostruisciTestoSms();
+        sendSMS(PrefissoInt + NumeroUtente1, TestoSMS);
+        sendSMS(PrefissoInt + NumeroUtente2, TestoSMS);
+      }
   } 
-  
-
-
-
-
-
 }
+//---------------------------------------------------------
+void CostruisciTestoSms(){
+  /*
+  Dati da trasmettere
+  - intCurrent
+  - intSogliaMilliampere
+  - ContaSecondiCorrenteElevata++;
+  - StatoAttuale
+  - 
+  */  
+  if (intCurrent < intSogliaMilliampere) {
+      String StringaStatoAttuale = "Stato: NoAlarm";
+  } else {
+      String StringaStatoAttuale = "Stato: Alarm";
+  }
 
+  String StringaStatoAttuale 
+  TestoSms = "SMS N " + String(ContaSMS) + "," +
+             "Corrente: " + String(intCurrent) + "mA, " +
+             "Soglia: " + String(intSogliaMilliampere) + "mA, " +
+             "Tempo: " + String(ContaSecondiCorrenteElevata) + "sec, " +
+             StringaStatoAttuale;
+  Serial.print("Testo SMS = ");Serial.println(TestoSms);
+}
 //---------------------------------------------------------
 void ProcessaAdcTensione(unsigned int adcValue) {
   // Interpolazione lineare tra i punti dati:
@@ -592,7 +613,7 @@ void Led_bianco_off(){
 //---------------
 const char PrimaCifraValida = '3';  //numeri cellulari in italia inziano con 3
 const String Pin = "19927";
-const String PrefissoInt = "+39";
+String PrefissoInt = "+39";
 
 String NumeroUtente1;
 String NumeroUtente2;
@@ -1332,6 +1353,7 @@ void Azione20(){
 //--------------------------------------------------------------------------
 
 void Azione21(){
+  CostruisciTestoSms();
   sendSMS(PrefissoInt + NumeroUtente1, TestoSMS);
   sendSMS(PrefissoInt + NumeroUtente2, TestoSMS);
 
