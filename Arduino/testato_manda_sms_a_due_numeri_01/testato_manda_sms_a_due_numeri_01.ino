@@ -64,6 +64,7 @@ void setup() {
   Serial.println("2 manda sms prova utente 2");
   Serial.println("3 forza utente 1 333210xxxx");
   Serial.println("4 forza utente 2 329703yyyy");
+  Serial.println("5 Legge i numeri 1 e 2");
   
 }
 
@@ -86,7 +87,14 @@ void loop() {
       processSMS("1992713332103169");//inserisce come numero 1 3332103169
     } else if (cmd == '4') {
       processSMS("1992723297037940");//inserisce come numero 1 3332103169
+    } else if (cmd == '5') {
+      Serial.println("NumeroUtente1 da EEPROM: " + NumeroUtente1);
+      Serial.println("NumeroUtente2 da EEPROM: " + NumeroUtente2);
     }
+
+
+
+
   }
 }
 

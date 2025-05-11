@@ -1,4 +1,4 @@
-String Versione = "amp-sogl-21_sms";
+String Versione = "amp-sogl-sms18";
 /*
 = alla vers. amp-sogl-17 ma con librerie in locale nel progetto
 Per entrare nel menu scrivere "Menu" a 115200 baud
@@ -22,16 +22,57 @@ Al reset se si parte con il pulsante premuto si disablita il buzzer
 
 
 */
+/*
+Per cambiare i numeri da sms mandare il seguente sms
+pin + n.utente (1 o 2) + telefono senza prefisso
+esempio con pin 99887
+99887 1 3331234567     senza spazi mette utente 1 = 3331234567
+99887 2 3339876543     senza spazi mette utente 1 = 3339876543
+
+C'è una nuova variabile in EEPROM ContaSmsEEprom
+Ad ogni reset il suo valore viene scritto in ContaSMS
+Ogni volta che si chiama sendSMS() si incrementa il numero di ContaSMS
+Il valore di ContaSMS viene scritto in EEprom
+Tutto con Printf di debug
+Se ricevo sms con Pin2 azzero contasms ram ed eeprom
+
+inoltre se la sim riceve un sms contenente il Pin2 azzera il contasms sia in ram che in eeprom
+*/
+
+
+
+
 #include <Wire.h>
 #include "LiquidCrystal_I2C.h"
 #include <SoftwareSerial.h>
 #include <EEPROM.h>
-
-// SIM800L su pin 7 RX, 8 TX (adatta se usi diversi pin)
-SoftwareSerial sim800(10, 11);
+#include <stdio.h> // Includi la libreria per sprintf
 
 // Imposta l'indirizzo I2C del modulo (generalmente 0x27 o 0x3F)
 LiquidCrystal_I2C lcd(0x27, 16, 2);
+
+// SIM800L su pin 7 RX, 8 TX (adatta se usi diversi pin)
+SoftwareSerial sim800(9, 11); //rx, tx
+
+const String Pin = "19927";
+const String PrefissoInt = "+39";
+const String Pin2 = "19999"; // "Azzera conta sms"
+
+String SmsAllarme;
+String NumeroUtente1;
+String NumeroUtente2;
+
+bool SmsDaInviare = true; // messo false sopo il primo inviane viene inviato solo 1
+bool InviaOraSms = false; // messo true al primo errore
+
+int ContaSMS = 0; // Inizializzato a 0
+
+// Indirizzo EEPROM per il contatore SMS
+const int addrContaSms = 40; // Scegli un indirizzo che non si sovrapponga agli altri
+
+// EEPROM offset (ogni numero max 15 caratteri)
+const int addr1 = 0;
+const int addr2 = 20;
 
 bool DebugOn=false; //se true usa i valori del potenziometro al posto di quello dei sensori
 int buttonState = 0;  // variable for reading the pushbutton status
@@ -45,7 +86,6 @@ const int ValoreAdcSoglia0ampere = 0x0;     // Valore Adc Corrente 0 Ampere, da 
 unsigned int adcValue ; //  valore dall'ADC
 
 float currentSensor;
-bool UnSoloSms = false;
 
 
 
@@ -63,7 +103,7 @@ bool UnSoloSms = false;
 
 //
 
-float floatVoltage;
+
 
 
 char strVoltage[5]; // 4 caratteri + 1 per il terminatore di stringa
@@ -79,7 +119,7 @@ unsigned int ContaSecondiCorrenteElevata = 0;
 
 char strContaSecondiCorrenteElevata[5];
 
-int ContaSMS = 1; //conta gli sms dal reset
+
 //------------------------------------------------------------
 //------------------------------------------------------------
 //------------------------------------------------------------
@@ -135,7 +175,6 @@ int counter = 1000;
 //------------------------------------
 
 //PROTOTIPI
-void sendSMS(String numero, String messaggioBase);
 void Azione1(void);
 void Azione2(void);
 void Azione3(void);
@@ -190,7 +229,9 @@ void CheckIfMenu(){
 
     // Verifica se il buffer contiene la parola "Menu"
     if (inputBuffer.endsWith("Menu")) {
-      Serial.println("Comando 'Menu' rilevato! Entrando nella funzione Menu().");
+      //Serial.println("Comando 'Menu' rilevato! Entrando nella funzione Menu().");
+      Serial.println(F("Comando 'Menu' rilevato! Entrando nella funzione Menu()."));
+      
       Menu(); // Chiama la funzione Menu()
       inputBuffer = ""; // Resetta il buffer
     }
@@ -224,13 +265,15 @@ void loop(){
 
   while (true) {
 
-
     // Controllo SMS in arrivo
     if (sim800.available()) {
       String sms = sim800.readString();
-      Serial.println("SMS ricevuto: " + sms);
+      Serial.print(F("Evento SIM: "));
+      Serial.println(sms);
       processSMS(sms);
     }
+
+
 
     // Esegui la funzione desiderata
     CheckIfMenu();//  verifica se devo entrare nel menu
@@ -254,8 +297,10 @@ void loop(){
       previousMillis = currentMillis;
       ContaSecondi++;
       Azione10(); //compara corrente sensore con soglia potenziometro
-      Serial.print("ContaSecondi= ");Serial.print(ContaSecondi);
-      Serial.print(" - ContaSecondiCorrenteElevata= ");Serial.print(ContaSecondiCorrenteElevata);
+      Serial.print(F("ContaSecondi= "));
+      Serial.print(ContaSecondi);
+      Serial.print(F(" - ContaSecondiCorrenteElevata= "));
+      Serial.print(ContaSecondiCorrenteElevata);
       
     } 
   }
@@ -367,16 +412,16 @@ void BlinkWaitQ(void){
   snprintf(StrSogliaMilliampere, sizeof(StrSogliaMilliampere), "%4d", intSogliaMilliampere);
 
   // Stampa i risultati sul monitor seriale
-  Serial.print("ADC letto (hex): 0x");
-  Serial.print(valoreAdcLetto, HEX); // Stampa il valore ADC in esadecimale
+  Serial.print(F("ADC letto (hex): 0x"));
+  Serial.println(valoreAdcLetto, HEX); // Stampa il valore ADC in esadecimale
 
-  Serial.print(" - Float Soglia (mA): ");
-  Serial.print(FloatSogliaMilliampere); // Stampa lo scostamento in decimale
+  Serial.print(F(" - Float Soglia (mA): "));
+  Serial.println(FloatSogliaMilliampere); // Stampa lo scostamento in decimale
 
-  Serial.print(" - int Soglia (mA): ");
-  Serial.print(intSogliaMilliampere); // Stampa lo scostamento in decimale
+  Serial.print(F(" - int Soglia (mA): "));
+  Serial.println(intSogliaMilliampere); // Stampa lo scostamento in decimale
 
-  Serial.print(" - Strings Soglia (mA): ");
+  Serial.print(F(" - Strings Soglia (mA): "));
   Serial.println(StrSogliaMilliampere); // Stampa lo scostamento in decimale
  }
 
@@ -388,14 +433,16 @@ void BlinkWaitQ(void){
 void ProcessaSensoreCorrente(unsigned int adcValue){
 
   // Calcola la tensione corrispondente al valore ADC
-  Serial.print("AdcCurr=");Serial.print(adcValue);
+  Serial.print(F("AdcCurr="));
+  Serial.print(adcValue);
   
   float floatVoltageSensore = adcValue * (5.0 / 1023.0);
   Serial.print(" - floatVoltageSensore=");Serial.print(floatVoltageSensore);
 
   // Calcola lo scostamento in bit dallo zero (2.5V)
   int deltaBit = adcValue - 512; // 512 è il valore ADC corrispondente a 2.5V
-  Serial.print(" - deltaBit=");Serial.print(deltaBit);
+  Serial.print(F(" - deltaBit="));
+  Serial.print(deltaBit);
 
   // Interpolazione lineare tra i punti dati:
   // (2.07V, -350mA) e (2.5V, 0mA)
@@ -412,7 +459,8 @@ void ProcessaSensoreCorrente(unsigned int adcValue){
 
     // Approssima il float al numero intero più vicino
   intCurrent = static_cast<int>(round(currentSensor));
-  Serial.print(" - intCurrent=");Serial.print(intCurrent);
+  Serial.print(F(" - intCurrent="));
+  Serial.print(intCurrent);
 
   // Usa snprintf per formattare la stringa
   // '%+5d' assicura che il numero sia allineato a destra con segno
@@ -426,11 +474,8 @@ void ProcessaSensoreCorrente(unsigned int adcValue){
   */
 
   // Stampa il risultato
-  Serial.print(" - strCurrent='");  Serial.print(strCurrent); Serial.println("'");
-
-
-
-
+  Serial.print(F(" - strCurrent='"));
+  Serial.print(strCurrent); Serial.println("'");
 }
 //----------------------------------------------
 float mapFloat(float x, float in_min, float in_max, float out_min, float out_max) {
@@ -441,13 +486,15 @@ float mapFloat(float x, float in_min, float in_max, float out_min, float out_max
 
 void ControllaSogliaSuperata() {
 
-  intCurrent = abs(intCurrent); // toglie il segno
-  Serial.println("intCurrent="); Serial.print(intCurrent);
-  Serial.println(" - Soglia="); Serial.print(intSogliaMilliampere);
+  intCurrent = abs(intCurrent); // toglie il segno 
+  Serial.println(F("intCurrent"));
+  Serial.print(intCurrent);
+  Serial.println(F(" - Soglia="));
+  Serial.print(intSogliaMilliampere);
 
   // Controllo della corrente rispetto alla soglia
   if (intCurrent < intSogliaMilliampere) {
-      Serial.println(" - Corrente inferiore soglia");
+      Serial.println(F(" - Corrente inferiore soglia"));
       // Se la corrente è inferiore alla soglia
       digitalWrite(Buzzer, LOW); // Spegne il Tone
       digitalWrite(Rele_Contatto, LOW); // Stacca il relay
@@ -459,11 +506,31 @@ void ControllaSogliaSuperata() {
       Led_verde_off();
       
   } else {
-      Serial.println(" - Corrente SUPERIORE soglia");
+      Serial.println("");
+      Serial.println(F(" - Corrente SUPERIORE soglia"));
       // Se la corrente è maggiore o uguale alla soglia
       digitalWrite(Rele_Contatto, HIGH); // Alimenta il relay
       digitalWrite(Rele_Buzzer, HIGH); // Alimenta il relay
       ContaSecondiCorrenteElevata++;
+
+      //qui processa l'invio dell'SMS di errore
+      //bool SmsDaInviare = true; // messo false sopo il primo inviane viene inviato solo 1
+      //bool InviaOraSms = false; // messo true al primo errore
+      if(SmsDaInviare){
+        SmsDaInviare=false; //non ne invia più un secondo se non richiesto
+        InviaOraSms = true; //appena finita la stringa manda il messaggio
+
+
+        
+        
+        //sendSMS(PrefissoInt + NumeroUtente1, SmsAllarme);
+        //sendSMS(PrefissoInt + NumeroUtente2, SmsAllarme);
+         
+
+      }
+
+
+
 
       if (ContaSecondi % 2 == 0) {
         playTone(NOTE_MI, 500);
@@ -481,44 +548,25 @@ void ControllaSogliaSuperata() {
         Led_verde_on();
       }
 
-      if (!UnSoloSms){
-        //si manda sms solo la prima volta
-        UnSoloSms = true;
-        CostruisciTestoSms();
-        sendSMS(PrefissoInt + NumeroUtente1, TestoSMS);
-        sendSMS(PrefissoInt + NumeroUtente2, TestoSMS);
-      }
-  } 
-}
-//---------------------------------------------------------
-void CostruisciTestoSms(){
-  /*
-  Dati da trasmettere
-  - intCurrent
-  - intSogliaMilliampere
-  - ContaSecondiCorrenteElevata++;
-  - StatoAttuale
-  - 
-  */  
-  if (intCurrent < intSogliaMilliampere) {
-      String StringaStatoAttuale = "Stato: NoAlarm";
-  } else {
-      String StringaStatoAttuale = "Stato: Alarm";
-  }
 
-  String StringaStatoAttuale 
-  TestoSms = "SMS N " + String(ContaSMS) + "," +
-             "Corrente: " + String(intCurrent) + "mA, " +
-             "Soglia: " + String(intSogliaMilliampere) + "mA, " +
-             "Tempo: " + String(ContaSecondiCorrenteElevata) + "sec, " +
-             StringaStatoAttuale;
-  Serial.print("Testo SMS = ");Serial.println(TestoSms);
+
+
+
+  } 
+  
+
+
+
+
+
 }
+
 //---------------------------------------------------------
 void ProcessaAdcTensione(unsigned int adcValue) {
   // Interpolazione lineare tra i punti dati:
   // (20 bit, 2V) e (500 bit, 12V)  floatVoltage = mapFloat2(adcValue, 20, 500, 2.0, 12.0);
   // nuovo partitore 5,05v 211bit e 12.0v 535bit
+  float floatVoltage;
 
   Serial.print("adcValue="); Serial.print(adcValue);
 
@@ -530,7 +578,8 @@ void ProcessaAdcTensione(unsigned int adcValue) {
 
   // Approssima il valore a una cifra decimale
   float roundedVoltage = round(floatVoltage * 10.0) / 10.0;
-  Serial.print(" - roundedVoltage="); Serial.print(roundedVoltage);
+  Serial.print(F(" - roundedVoltage="));
+  Serial.print(roundedVoltage);
 
   // Converte il valore approssimato in una stringa temporanea
   char tempStr[6]; // Buffer temporaneo leggermente più grande per la conversione
@@ -547,8 +596,9 @@ void ProcessaAdcTensione(unsigned int adcValue) {
   }
 
     // Copia la stringa nel buffer finale allineata a destra
-    snprintf(strVoltage, 5, "%4s", tempStr);
-  Serial.print(" - strVoltage="); Serial.print(strVoltage);
+  snprintf(strVoltage, 5, "%4s", tempStr); 
+  Serial.print(F(" - strVoltage="));
+  Serial.print(strVoltage);
 
   Serial.println();
 
@@ -611,19 +661,6 @@ void Led_bianco_off(){
   digitalWrite(Led_Bianco, LOW); // 
 }  
 //---------------
-const char PrimaCifraValida = '3';  //numeri cellulari in italia inziano con 3
-const String Pin = "19927";
-String PrefissoInt = "+39";
-
-String NumeroUtente1;
-String NumeroUtente2;
-
-String TestoSMS = "questo è il testo sms";
-
-// EEPROM offset (ogni numero max 15 caratteri)
-const int addr1 = 0;
-const int addr2 = 20;
-
 // Funzioni di EEPROM
 void writeStringToEEPROM(int addrOffset, const String &str) {
   for (int i = 0; i < str.length(); i++) {
@@ -645,6 +682,28 @@ String readStringFromEEPROM(int addrOffset) {
   return String(data);
 }
 
+// Funzioni per la gestione del contatore SMS in EEPROM
+void writeContaSmsEEPROM(int value) {
+  EEPROM.put(addrContaSms, value);
+  Serial.print(F("Scritto in EEPROM ContaSmsEEprom indirizzo "));
+  Serial.print(addrContaSms);
+  Serial.print("");
+  Serial.print(F(" Valore "));
+  Serial.println(value);
+
+}
+
+int readContaSmsEEPROM() {
+  int value;
+  EEPROM.get(addrContaSms, value);
+
+  Serial.print(F("Letto da EEPROM ContaSmsEEprom indirizzo "));
+  Serial.print(addrContaSms);
+  Serial.print("");
+  Serial.print(F(" Valore "));
+  Serial.println(value);
+  return value;
+}
 
 //xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
@@ -675,14 +734,6 @@ void setup() {
 //erial.println( F ("Attivato"));    
    //start serial connection
   Serial.begin(115200); // terminale
-
-  sim800.begin(57600);
-  delay(500);
-  Serial.print("Nome file: ");
-  Serial.println(__FILE__);
-  delay(1500);  
-
-
   Serial.println();
   Serial.println( F ("|******   SISTEMA RESETTATO  ******|"));
   Serial.println( F (" Sketch build xxxxx "));
@@ -701,6 +752,12 @@ void setup() {
     SirenaFranceseVeloce();
   }
 
+  sim800.begin(57600);
+  delay(500);
+  Serial.print(F("Nome file: "));
+  Serial.println(__FILE__);
+  delay(1500);
+
   // Legge i numeri da EEPROM
   NumeroUtente1 = readStringFromEEPROM(addr1);
   NumeroUtente2 = readStringFromEEPROM(addr2);
@@ -708,12 +765,18 @@ void setup() {
   Serial.println("NumeroUtente1 da EEPROM: " + NumeroUtente1);
   Serial.println("NumeroUtente2 da EEPROM: " + NumeroUtente2);
 
+  // Legge il contatore SMS da EEPROM e lo scrive in ContaSMS
+  ContaSMS = readContaSmsEEPROM();
+  Serial.print(F("ContaSMS dopo reset:"));
+  Serial.println(ContaSMS);
+
   sim800.println("AT");
   delay(1000);
   sim800.println("AT+CMGF=1");  // Modalità testo
   delay(1000);
   sim800.println("AT+CNMI=1,2,0,0,0");  // Ricezione immediata SMS
   delay(1000);
+
 
 
 }
@@ -751,7 +814,7 @@ void TypeMenuList(void){
     Serial.println();
     Serial.println( F ("|*******************************************"));
     Serial.println( F ("|             ʘ‿ʘ   Menù   (◡_◡)          "));
-      Serial.print( F ("|  Ver. "));Serial.println(Versione);
+    Serial.print( F ("|  Ver. "));Serial.println(Versione);
     Serial.println( F ("|*******************************************"));
     Serial.println( F ("  0 Reset"));
     Serial.println( F ("  1 Test display 2x16 12385678 ABCDEFGH.."));
@@ -786,7 +849,12 @@ void TypeMenuList(void){
    Serial.println( F (" 18 Legge tutti gli ADC"));
    Serial.println( F (" 19 Legge solo ADC usati"));
    Serial.println( F (" 20 Test tutti gli output di nano, da D2 a d13"));
-   Serial.println( F (" 21 Manda SMS ai due numeri"));
+   Serial.println( F (" 21 Manda sms prova utente 1"));
+   Serial.println( F (" 22 Manda sms prova utente 2"));
+   Serial.println( F (" 23 Forza utente 1 3332100000"));
+   Serial.println( F (" 24 Forza utente 2 3472100000"));
+   Serial.println( F (" 25 Legge i numeri 1 e 2"));
+   
    Serial.println( F (" 99 Torna al loop senza reset"));
   
 }
@@ -816,7 +884,8 @@ void Menu() {
 
     // arrivato un carattere
     int CmdMenu = Serial.parseInt();
-    Serial.print( F ("ricevuto CmdMenu "));Serial.println(CmdMenu);
+    Serial.print( F ("ricevuto CmdMenu "));
+    Serial.println(CmdMenu);
 
     switch (CmdMenu){
       //-------------------------------------------------
@@ -936,6 +1005,30 @@ void Menu() {
         Azione21();
       break;
       //-------------------------------------------------
+      //-------------------------------------------------
+      case 22:
+        //     swap debug;
+        Azione22();
+      break;
+      //-------------------------------------------------
+      //-------------------------------------------------
+      case 23:
+        //     swap debug;
+        Azione23();
+      break;
+      //-------------------------------------------------
+      //-------------------------------------------------
+      case 24:
+        //     swap debug;
+        Azione24();
+      break;
+      //-------------------------------------------------
+      //-------------------------------------------------
+      case 25:
+        //     swap debug;
+        Azione25();
+      break;
+      //-------------------------------------------------
 
 
       case 99:
@@ -1012,9 +1105,12 @@ void Azione4(void){
   // lo manda al display LCD riga 1 posizione 12
   lcd.setCursor(8, 0); // Posiziona il cursore sulla prima riga, colonna 1
   lcd.print(" SmA");
+  SmsAllarme = "";
+  SmsAllarme = SmsAllarme + " Soglia=";
 
   lcd.setCursor(12, 0); // Posiziona il cursore sulla prima riga, colonna 1
   lcd.print(StrSogliaMilliampere);
+  SmsAllarme = SmsAllarme + StrSogliaMilliampere;
 }
 
 //-----------------------------------------------
@@ -1049,9 +1145,11 @@ void Azione6(void){
   // lo manda al display LCD riga 1 posizione 12
   lcd.setCursor(0, 0); // Posiziona il cursore sulla prima riga, colonna 1
   lcd.print("ImA=");
+  SmsAllarme = SmsAllarme + " Corrente=";
 
   lcd.setCursor(3, 0); // Posiziona il cursore sulla prima riga, colonna 1
   lcd.print(strCurrent);
+  SmsAllarme = SmsAllarme + strCurrent;
 
 
 }
@@ -1093,9 +1191,11 @@ void Azione8(void){
   // lo manda al display LCD riga 1 posizione 12
   lcd.setCursor(0, 1); // Posiziona il cursore sulla prima riga, colonna 1
   lcd.print("Volt");
+  SmsAllarme = SmsAllarme + " Volt=";
 
   lcd.setCursor(4, 1); // Posiziona il cursore sulla prima riga, colonna 1
   lcd.print(strVoltage);
+  SmsAllarme = SmsAllarme + strVoltage;
 
 
 }
@@ -1109,11 +1209,22 @@ void Azione9(void){
 
   // check if the pushbutton is pressed. If it is, the buttonState is HIGH:
   if (buttonState == LOW) {
-    Serial.println("Button premuto");
+    Serial.println(F("Button premuto"));
     ContaSecondiCorrenteElevata=0;
+    SmsDaInviare = true; // messo false sopo il primo inviane viene inviato solo 1
+    InviaOraSms = false; // messo true al primo errore
+
+    //Reinizializza la sim
+
+    sim800.println("AT");
+    delay(1000);
+    sim800.println("AT+CMGF=1");  // Modalità testo
+    delay(1000);
+    sim800.println("AT+CNMI=1,2,0,0,0");  // Ricezione immediata SMS
+    delay(1000);
   } else {
     // turn LED off:
-    Serial.println("Button rilasciato");
+    Serial.println(F("Button rilasciato"));
   }
   
 
@@ -1132,9 +1243,39 @@ void Azione10(void){
   // lo manda al display LCD riga 1 posizione 12
   lcd.setCursor(8, 1); // Posiziona il cursore sulla prima riga, colonna 1
   lcd.print(" Err");
+  SmsAllarme = SmsAllarme + " TempoAll=";
 
   lcd.setCursor(12, 1); // Posiziona il cursore sulla prima riga, colonna 1
   lcd.print(strContaSecondiCorrenteElevata);
+  SmsAllarme = SmsAllarme + strContaSecondiCorrenteElevata;
+
+
+  SmsAllarme = SmsAllarme + " TempoTotale=";
+  SmsAllarme = SmsAllarme + String(ContaSecondi);
+
+  Serial.println(F("xxxxxxxxxxx Debug SMS allarme"));
+  Serial.println(SmsAllarme);
+  Serial.println(F("xxxxxxxxxxx Debug SMS allarme"));
+
+  if (InviaOraSms){
+    InviaOraSms = false;
+    Serial.println(F("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"));
+    Serial.println(F("Simulazione SMS alarme"));
+    Serial.println(SmsAllarme);
+    qualcosa non va qui, sms vuoto
+    sendSMS(PrefissoInt + NumeroUtente1, SmsAllarme);
+    sendSMS(PrefissoInt + NumeroUtente2, SmsAllarme);
+
+
+
+
+    Serial.println(F("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"));
+  
+
+  } 
+
+
+
 
 
 }
@@ -1172,8 +1313,10 @@ void Azione15(void){
       previousMillis = currentMillis;
       ContaSecondi++;
       Azione10(); //compara corrente sensore con soglia potenziometro
-      Serial.print("ContaSecondi= ");Serial.print(ContaSecondi);
-      Serial.print(" - ContaSecondiCorrenteElevata= ");Serial.print(ContaSecondiCorrenteElevata);
+      Serial.print(F("ContaSecondi= "));
+      Serial.print(ContaSecondi);
+      Serial.print(F(" - ContaSecondiCorrenteElevata= "));
+      Serial.print(ContaSecondiCorrenteElevata);
       
     } 
 
@@ -1217,7 +1360,7 @@ void Azione18(){
     if (Serial.available() > 0) {
       char receivedChar = Serial.read(); // Legge il carattere inviato via seriale
       if (receivedChar == 'Q' || receivedChar == 'q') {
-        Serial.println("Interruzione della lettura.");
+        Serial.println(F("Interruzione della lettura."));
         break; // Esce dal ciclo e dalla funzione
       }
     }
@@ -1232,16 +1375,16 @@ void Azione18(){
 
     // Invia i valori in esadecimale su una riga al terminale seriale
     for (int i = 0; i < 8; i++) {
-      Serial.print("0x"); // Aggiungi uno spazio tra i valori
+      Serial.println(F("0x"));
       if (adcValues[i] < 0x100) {
-        Serial.print("0"); // Aggiungi uno zero iniziale se il valore è inferiore a 0x10
+        Serial.print(F("0"));
       }
       if (adcValues[i] < 0x10) {
-        Serial.print("0"); // Aggiungi uno zero iniziale se il valore è inferiore a 0x10
+        Serial.print(F("0"));
       }
       Serial.print(adcValues[i], HEX); // Stampa il valore in esadecimale
       if (i < 7) {
-        Serial.print(" "); // Aggiungi uno spazio tra i valori
+        Serial.print(F(" "));
       }
     }
     Serial.println(); // Vai a capo dopo aver inviato tutti i valori
@@ -1275,21 +1418,22 @@ void Azione19(void){
       int voltageValue = analogRead(AdcVoltageBattery);
 
       // Stampa i valori in formato decimale ed esadecimale
-      Serial.print("Pot A7 = ");
+
+      Serial.println(F("Pot A7 = "));
       Serial.print(potValue);
-      Serial.print(" 0x");
+
+      Serial.print(F(" 0x"));
       Serial.print(potValue, HEX);  // Stampa il valore in esadecimale
 
-      Serial.print(" | Current A2 = ");
+      Serial.print(F(" | Current A2 = "));
       Serial.print(currentValue);
-      Serial.print(" 0x");
+      Serial.print(F(" 0x"));
       Serial.print(currentValue, HEX);
 
-      Serial.print(" | Voltage A3 = ");
+      Serial.print(F(" | Voltage A3 = "));
       Serial.print(voltageValue);
-      Serial.print(" 0x");
+      Serial.print(F(" 0x"));
       Serial.println(voltageValue, HEX);  // Usa println per andare a capo
-
     }
 
     // Controlla se ci sono dati disponibili sulla seriale
@@ -1332,7 +1476,7 @@ void Azione20(){
     if (Serial.available() > 0) {
       char receivedChar = Serial.read(); // Legge il carattere inviato via seriale
       if (receivedChar == 'Q' || receivedChar == 'q') {
-        Serial.println("Interruzione della lettura.");
+        Serial.println(F("Interruzione della lettura."));
         break; // Esce dal ciclo e dalla funzione
       }
 
@@ -1343,25 +1487,35 @@ void Azione20(){
         digitalWrite(pin, HIGH); // Accendi il pin corrente
         delay(250);        // Aspetta per 200 ms
         digitalWrite(pin, LOW);  // Spegni il pin corrente
-        Serial.print(" D");Serial.print(pin);
+        Serial.print(F(" D"));
+        Serial.print(pin);
     }
   }
 }
 
 
-
 //--------------------------------------------------------------------------
-
 void Azione21(){
-  CostruisciTestoSms();
-  sendSMS(PrefissoInt + NumeroUtente1, TestoSMS);
-  sendSMS(PrefissoInt + NumeroUtente2, TestoSMS);
-
+  sendSMS(PrefissoInt + NumeroUtente1, "Test sms utente 1"); 
 }
-
 //--------------------------------------------------------------------------
+void Azione22(){
+  sendSMS(PrefissoInt + NumeroUtente2, "Test SMS utente 2");
+}
 //--------------------------------------------------------------------------
-
+void Azione23(){
+  processSMS("1992713332100000");//inserisce come numero 1 3332100000
+}
+//--------------------------------------------------------------------------
+void Azione24(){
+  processSMS("1992723472100000");//inserisce come numero 2 3472100000
+}
+//--------------------------------------------------------------------------
+void Azione25(){
+  Serial.println("NumeroUtente1 da EEPROM: " + NumeroUtente1);
+  Serial.println("NumeroUtente2 da EEPROM: " + NumeroUtente2);  
+}
+//--------------------------------------------------------------------------
 
 
 void Azione99(){
@@ -1374,52 +1528,77 @@ void Azione99(){
   
 }
 //--------------------------------------------------------------------------
+
+
+
+
 void processSMS(String sms) {
-  // Cerca il PIN all'inizio
+  // Controllo per il PIN di azzeramento
+  if (sms.indexOf(Pin2) != -1) {
+    // Azzera il contatore in RAM
+    ContaSMS = 0;
+    Serial.print(F("Azzerato ContaSmsEEprom indirizzo "));
+    Serial.print(addrContaSms);
+    Serial.println(F(" Valore "));
+    Serial.println(ContaSMS);
+
+    // Azzera il contatore in EEPROM
+    writeContaSmsEEPROM(ContaSMS); // Scrive 0 nell'EEPROM
+    Serial.println(F("ContaSmsEEprom azzerato tramite SMS."));
+
+    // Puoi anche inviare un SMS di conferma (opzionale)
+    sendSMS(PrefissoInt + NumeroUtente1, (String(ContaSMS) + " Contatore SMS azzerato.")); // Invia a utente 1 come esempio
+    return; // Esci dalla funzione processSMS per evitare ulteriori elaborazioni
+  }
+
+  // Cerca il PIN per la modifica dei numeri
   int pinIndex = sms.indexOf(Pin);
   if (pinIndex != -1) {
     int idx = pinIndex + Pin.length();
     char userIndex = sms[idx];
     String newNumber = sms.substring(idx + 1, idx + 11);  // 10 cifre
 
-    Serial.println("Tentativo cambio numero per utente: " + String(userIndex));
-    Serial.println("Nuovo numero proposto: " + newNumber);
+    Serial.print(F("Tentativo cambio numero per utente: "));
+    Serial.println(String(userIndex));
+    Serial.print(F("Nuovo numero proposto: "));
+    Serial.print(newNumber);
 
     if (userIndex == '1' && newNumber.length() == 10) {
       NumeroUtente1 = newNumber;
       writeStringToEEPROM(addr1, newNumber);
-      Serial.println("NumeroUtente1 aggiornato: " + NumeroUtente1);
+      Serial.print(F("NumeroUtente1 aggiornato: "));
+      Serial.println(NumeroUtente1);
+      sendSMS(PrefissoInt + NumeroUtente1, "Utente 1 connesso allarm3 corrente");
     } else if (userIndex == '2' && newNumber.length() == 10) {
       NumeroUtente2 = newNumber;
       writeStringToEEPROM(addr2, newNumber);
-      Serial.println("NumeroUtente2 aggiornato: " + NumeroUtente2);
+      Serial.print("");
+      Serial.print(F("NumeroUtente2 aggiornato: "));
+      Serial.println(NumeroUtente2);
+      sendSMS(PrefissoInt + NumeroUtente2, "Utente 2 connesso allarme corrente");
     } else {
-      Serial.println("Formato SMS non valido");
+      Serial.println(F("Formato SMS non valido"));
     }
   }
 }
-void sendSMS(String numero, String messaggioBase) {
-  String numeroLocale = numero;
-  if (numero.startsWith(PrefissoInt)) {
-    numeroLocale = numero.substring(PrefissoInt.length());
-  }
 
-  if (numeroLocale.length() != 10 || numeroLocale[0] != PrimaCifraValida) {
-    Serial.println("Numero non valido, SMS non inviato: " + numero);
-    return;
-  }
-
-  String messaggio = "SMS" + String(ContaSMS) + " " + messaggioBase;
-
-  Serial.println("Invio SMS a: " + numero);
-  Serial.println("Contenuto SMS: " + messaggio);
-
+void sendSMS(String numero, String messaggio) {
+  messaggio = ("#" + String(ContaSMS) + " " + messaggio);
+  Serial.print(F("Invio SMS a: "));
+  Serial.print(numero);
   sim800.println("AT+CMGS=\"" + numero + "\"");
   delay(1000);
   sim800.print(messaggio);
-  sim800.write(26); // Ctrl+Z
-  Serial.println("SMS inviato.");
+  sim800.write(26); // Ctrl+Z per inviare
+  Serial.println(F("SMS inviato."));
 
+  // Incrementa il contatore SMS e lo scrive in EEPROM
   ContaSMS++;
+  writeContaSmsEEPROM(ContaSMS);
+  delay(300);
+  Serial.print(F("ContaSMS incrementato a:"));
+  Serial.println(ContaSMS);
   delay(5000);
 }
+
+
