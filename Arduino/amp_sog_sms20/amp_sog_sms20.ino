@@ -1,5 +1,7 @@
-String Versione = "amp-sogl-sms19";
+String Versione = "amp-sogl-sms20";
 /*
+versione di sendsms proposta da chatgpt
+
 = alla vers. amp-sogl-17 ma con librerie in locale nel progetto
 Per entrare nel menu scrivere "Menu" a 115200 baud
 
@@ -1538,8 +1540,8 @@ void Azione22(){
   //sendSMS(PrefissoInt + NumeroUtente2, "Test SMS utente 2");
   CreaTestoSmsValori();
   String Messaggio = String(TestoSmsUltimiDati);
-  //sendSMS(PrefissoInt + NumeroUtente1, Messaggio);
-  messaggio continua a rimanere vuoto
+  sendSMS(PrefissoInt + NumeroUtente1, Messaggio);
+  //messaggio continua a rimanere vuoto
   Serial.print("Messaggio ");Serial.println(Messaggio);
 }
 //--------------------------------------------------------------------------
@@ -1639,7 +1641,8 @@ void processSMS(String sms) {
     }
   }
 }
-
+/*
+v1 lucio
 void sendSMS(String numero, String messaggio) {
   messaggio = ("#" + String(ContaSMS) + " " + messaggio);
   Serial.print(F("Invio SMS a: "));
@@ -1657,6 +1660,90 @@ void sendSMS(String numero, String messaggio) {
   Serial.print(F("ContaSMS incrementato a:"));
   Serial.println(ContaSMS);
   delay(5000);
+}*/
+
+/*
+v2 chatgpt
+void sendSMS(String numero, String messaggio) {
+  messaggio = "#" + String(ContaSMS) + " " + messaggio;
+
+  Serial.print(F("Invio SMS a: "));
+  Serial.println(numero);
+
+  // Invia il comando AT con numero, ma usando .c_str()
+  sim800.print(F("AT+CMGS=\""));
+  sim800.print(numero.c_str());  // meglio usare c_str()
+  sim800.println(F("\""));
+  delay(1000);  // attesa per il prompt '>'
+
+  // Invia il testo del messaggio
+  sim800.print(messaggio.c_str());  // usa c_str() per invio affidabile
+
+  // Termina con Ctrl+Z (ASCII 26)
+  sim800.write(26);
+  Serial.println(F("SMS inviato."));
+
+  // Aggiorna contatore
+  ContaSMS++;
+  writeContaSmsEEPROM(ContaSMS);
+  delay(300);
+  Serial.print(F("ContaSMS incrementato a: "));
+  Serial.println(ContaSMS);
+
+  delay(5000);  // attesa per stabilità del modulo
 }
+*/
+
+//v3 di chatgpt con risposta e gestione errore
+void sendSMS(String numero, String messaggio) {
+  // Aggiungi numero SMS e (opzionale) timestamp al testo
+  messaggio = "#" + String(ContaSMS) + " " + messaggio;
+  
+  Serial.print(F("Invio SMS a: "));
+  Serial.println(numero);
+
+  // Costruisci il comando AT+CMGS con c_str()
+  sim800.print(F("AT+CMGS=\""));
+  sim800.print(numero.c_str());
+  sim800.println(F("\""));
+
+  delay(1000);  // Attendi il prompt '>'
+
+  sim800.print(messaggio.c_str());
+  sim800.write(26);  // Ctrl+Z per invio
+  Serial.println(F("Comando di invio SMS inviato, attendo risposta..."));
+
+  // Attesa risposta del modulo
+  unsigned long timeout = millis() + 10000; // max 10 secondi
+  String risposta = "";
+
+  while (millis() < timeout) {
+    if (sim800.available()) {
+      char c = sim800.read();
+      risposta += c;
+    }
+    if (risposta.indexOf("OK") >= 0 || risposta.indexOf("+CMGS") >= 0) {
+      Serial.println(F("SMS inviato correttamente."));
+      break;
+    }
+    if (risposta.indexOf("ERROR") >= 0) {
+      Serial.println(F("Errore durante l'invio dell'SMS!"));
+      Serial.println("Risposta modulo: " + risposta);
+      return;
+    }
+  }
+
+  if (risposta.length() == 0) {
+    Serial.println(F("Timeout: nessuna risposta dal modulo."));
+  }
+
+  // Incrementa contatore e salva
+  ContaSMS++;
+  writeContaSmsEEPROM(ContaSMS);
+  delay(300);
+  Serial.print(F("ContaSMS incrementato a: "));
+  Serial.println(ContaSMS);
+}
+
 
 
