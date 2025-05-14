@@ -1,5 +1,8 @@
-String Versione = "amp-sogl-sms18";
+String Versione = "amp-sogl-sms21";
+String MessaggioSim = " ";
 /*
+versione di sendsms proposta da chatgpt
+
 = alla vers. amp-sogl-17 ma con librerie in locale nel progetto
 Per entrare nel menu scrivere "Menu" a 115200 baud
 
@@ -37,6 +40,22 @@ Tutto con Printf di debug
 Se ricevo sms con Pin2 azzero contasms ram ed eeprom
 
 inoltre se la sim riceve un sms contenente il Pin2 azzera il contasms sia in ram che in eeprom
+
+nota: chiamando la sim si ha:
+Evento SIM: 
+RING
+
+Evento SIM: 
+RING
+
+Evento SIM: 
+RING
+
+Evento SIM: 
+RING
+
+Evento SIM: 
+RING
 */
 
 
@@ -57,8 +76,9 @@ SoftwareSerial sim800(9, 11); //rx, tx
 const String Pin = "19927";
 const String PrefissoInt = "+39";
 const String Pin2 = "19999"; // "Azzera conta sms"
+const String Pin3 = "19988"; // Richiede status attuale
 
-String SmsAllarme;
+char TestoSmsDaInviare[100];  // spazio sufficiente per contenere tutti i dati
 String NumeroUtente1;
 String NumeroUtente2;
 
@@ -106,13 +126,13 @@ float currentSensor;
 
 
 
-char strVoltage[5]; // 4 caratteri + 1 per il terminatore di stringa
+char strVoltage[5] = "12.3"; // 4 caratteri + 1 per il terminatore di stringa
 
 int intCurrent;
-char strCurrent[6]; // 5 caratteri + 1 per il terminatore di stringa
+char strCurrent[6] = "200"; // 5 caratteri + 1 per il terminatore di stringa
 
 int intSogliaMilliampere; 
-char StrSogliaMilliampere[5]; // 4 caratteri + 1 per il terminatore di stringa
+char StrSogliaMilliampere[5] = "600"; // 4 caratteri + 1 per il terminatore di stringa
 
 unsigned int ContaSecondi = 0;
 unsigned int ContaSecondiCorrenteElevata = 0;
@@ -195,6 +215,14 @@ void Azione17(void);
 void Azione18(void);
 void Azione19(void);
 void Azione20(void);
+void Azione21(void);
+void Azione22(void);
+void Azione23(void);
+void Azione24(void);
+void Azione25(void);
+void Azione26(void);
+void CreaTestoSmsValori(void);
+
 void Azione99(void);
 void Menu(void);
 void WelcomeDisplay();
@@ -520,14 +548,17 @@ void ControllaSogliaSuperata() {
         SmsDaInviare=false; //non ne invia più un secondo se non richiesto
         InviaOraSms = true; //appena finita la stringa manda il messaggio
 
+        CreaTestoSmsValori();
+
 
         
         
-        //sendSMS(PrefissoInt + NumeroUtente1, SmsAllarme);
-        //sendSMS(PrefissoInt + NumeroUtente2, SmsAllarme);
+        //sendSMS(PrefissoInt + NumeroUtente1, TestoSmsDaInviare);
+        //sendSMS(PrefissoInt + NumeroUtente2, TestoSmsDaInviare);
          
 
       }
+
 
 
 
@@ -547,20 +578,41 @@ void ControllaSogliaSuperata() {
         Led_bianco_off();
         Led_verde_on();
       }
-
-
-
-
-
   } 
-  
-
-
-
-
-
 }
+//--------------------------------------------------------
+void CreaTestoSmsValori(){
 
+  Serial.println(StrSogliaMilliampere);
+  Serial.println(strCurrent);
+  Serial.println(strVoltage);
+  Serial.println(strContaSecondiCorrenteElevata);
+  Serial.println(ContaSecondi);
+
+
+/*
+  snprintf(TestoSmsDaInviare, sizeof(TestoSmsDaInviare),
+         "Volt:%s; Current:%s; Soglia:%s T.Err:%s TimeTot:%u",
+         strVoltage,
+         strCurrent,
+         StrSogliaMilliampere,
+         strContaSecondiCorrenteElevata,
+         ContaSecondi);
+*/         
+
+  snprintf(TestoSmsDaInviare, sizeof(TestoSmsDaInviare),
+         "Volt:%s Corr:%s Sogl:%s HigSec:%s TotSec:%u",
+         strVoltage,
+         strCurrent,
+         StrSogliaMilliampere,
+         strContaSecondiCorrenteElevata,
+         ContaSecondi);
+
+
+
+  Serial.print("TestoSmsDaInviare <<");Serial.print(TestoSmsDaInviare);Serial.println(">>");
+ 
+}
 //---------------------------------------------------------
 void ProcessaAdcTensione(unsigned int adcValue) {
   // Interpolazione lineare tra i punti dati:
@@ -835,7 +887,7 @@ void TypeMenuList(void){
         Serial.println("ON = ADC su potenz.");
         DebugOn = true;
       }
-    Serial.println( F (" 12 "));
+    Serial.println( F (" 12 Reset SIM"));
     Serial.println( F (" 13 Disabilita Buzzer"));
     Serial.println( F (" 14 Abilita Buzzer"));
     Serial.println( F (" 15 Ripete ciclo LOOP fino a Q"));
@@ -851,9 +903,10 @@ void TypeMenuList(void){
    Serial.println( F (" 20 Test tutti gli output di nano, da D2 a d13"));
    Serial.println( F (" 21 Manda sms prova utente 1"));
    Serial.println( F (" 22 Manda sms prova utente 2"));
-   Serial.println( F (" 23 Forza utente 1 3332100000"));
-   Serial.println( F (" 24 Forza utente 2 3472100000"));
+   Serial.println( F (" 23 Forza utente 1 3297039999"));
+   Serial.println( F (" 24 Forza utente 2 3332109999"));
    Serial.println( F (" 25 Legge i numeri 1 e 2"));
+   Serial.println( F (" 26 TestoSmsDaInviare"));
    
    Serial.println( F (" 99 Torna al loop senza reset"));
   
@@ -1029,6 +1082,12 @@ void Menu() {
         Azione25();
       break;
       //-------------------------------------------------
+    //-------------------------------------------------
+      case 26:
+        //     swap debug;
+        Azione26();
+      break;
+      //-------------------------------------------------
 
 
       case 99:
@@ -1105,12 +1164,10 @@ void Azione4(void){
   // lo manda al display LCD riga 1 posizione 12
   lcd.setCursor(8, 0); // Posiziona il cursore sulla prima riga, colonna 1
   lcd.print(" SmA");
-  SmsAllarme = "";
-  SmsAllarme = SmsAllarme + " Soglia=";
 
   lcd.setCursor(12, 0); // Posiziona il cursore sulla prima riga, colonna 1
   lcd.print(StrSogliaMilliampere);
-  SmsAllarme = SmsAllarme + StrSogliaMilliampere;
+
 }
 
 //-----------------------------------------------
@@ -1145,11 +1202,9 @@ void Azione6(void){
   // lo manda al display LCD riga 1 posizione 12
   lcd.setCursor(0, 0); // Posiziona il cursore sulla prima riga, colonna 1
   lcd.print("ImA=");
-  SmsAllarme = SmsAllarme + " Corrente=";
-
   lcd.setCursor(3, 0); // Posiziona il cursore sulla prima riga, colonna 1
   lcd.print(strCurrent);
-  SmsAllarme = SmsAllarme + strCurrent;
+
 
 
 }
@@ -1191,11 +1246,8 @@ void Azione8(void){
   // lo manda al display LCD riga 1 posizione 12
   lcd.setCursor(0, 1); // Posiziona il cursore sulla prima riga, colonna 1
   lcd.print("Volt");
-  SmsAllarme = SmsAllarme + " Volt=";
-
   lcd.setCursor(4, 1); // Posiziona il cursore sulla prima riga, colonna 1
   lcd.print(strVoltage);
-  SmsAllarme = SmsAllarme + strVoltage;
 
 
 }
@@ -1243,28 +1295,23 @@ void Azione10(void){
   // lo manda al display LCD riga 1 posizione 12
   lcd.setCursor(8, 1); // Posiziona il cursore sulla prima riga, colonna 1
   lcd.print(" Err");
-  SmsAllarme = SmsAllarme + " TempoAll=";
-
   lcd.setCursor(12, 1); // Posiziona il cursore sulla prima riga, colonna 1
   lcd.print(strContaSecondiCorrenteElevata);
-  SmsAllarme = SmsAllarme + strContaSecondiCorrenteElevata;
 
 
-  SmsAllarme = SmsAllarme + " TempoTotale=";
-  SmsAllarme = SmsAllarme + String(ContaSecondi);
+
 
   Serial.println(F("xxxxxxxxxxx Debug SMS allarme"));
-  Serial.println(SmsAllarme);
+  Serial.println(TestoSmsDaInviare);
   Serial.println(F("xxxxxxxxxxx Debug SMS allarme"));
 
   if (InviaOraSms){
     InviaOraSms = false;
     Serial.println(F("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"));
-    Serial.println(F("Simulazione SMS allarme"));
-    Serial.println(SmsAllarme);
-    //qualcosa non va qui, sms vuoto
-    //sendSMS(PrefissoInt + NumeroUtente1, SmsAllarme);
-    //sendSMS(PrefissoInt + NumeroUtente2, SmsAllarme);
+    Serial.println(F("Simulazione SMS alarme"));
+    Serial.println(TestoSmsDaInviare);
+    sendSMS(PrefissoInt + NumeroUtente1, TestoSmsDaInviare);
+    //sendSMS(PrefissoInt + NumeroUtente2, TestoSmsDaInviare);
 
 
 
@@ -1285,6 +1332,8 @@ void Azione11(void){
 
 }
 void Azione12(void){
+  Serial.println("Reset sim");
+  sim800.println("AT+CFUN=1,1");
 
 }
 void Azione13(void){
@@ -1500,20 +1549,29 @@ void Azione21(){
 }
 //--------------------------------------------------------------------------
 void Azione22(){
-  sendSMS(PrefissoInt + NumeroUtente2, "Test SMS utente 2");
+  //sendSMS(PrefissoInt + NumeroUtente2, "Test SMS utente 2");
+  CreaTestoSmsValori();
+  String Msg = String(TestoSmsDaInviare);
+  sendSMS(PrefissoInt + NumeroUtente1, Msg);
+  //messaggio continua a rimanere vuoto
+  Serial.print("Azione22 Msg ");Serial.println(Msg);
 }
 //--------------------------------------------------------------------------
 void Azione23(){
-  processSMS("1992713332100000");//inserisce come numero 1 3332100000
+  processSMS("1992713297039999");//inserisce come numero 1 3332100000
 }
 //--------------------------------------------------------------------------
 void Azione24(){
-  processSMS("1992723472100000");//inserisce come numero 2 3472100000
+  processSMS("1992723332109999");//inserisce come numero 2 3472100000
 }
 //--------------------------------------------------------------------------
 void Azione25(){
   Serial.println("NumeroUtente1 da EEPROM: " + NumeroUtente1);
   Serial.println("NumeroUtente2 da EEPROM: " + NumeroUtente2);  
+}
+//--------------------------------------------------------------------------
+void Azione26(){
+  CreaTestoSmsValori();
 }
 //--------------------------------------------------------------------------
 
@@ -1551,6 +1609,20 @@ void processSMS(String sms) {
     return; // Esci dalla funzione processSMS per evitare ulteriori elaborazioni
   }
 
+  // Controllo se è richiesto lo stato attuale all'utente1
+  if (sms.indexOf(Pin3) != -1) {
+    // Azzera il contatore in RAM
+    Serial.print(F("Mando la situazione attuale "));
+    CreaTestoSmsValori();
+    Serial.println(TestoSmsDaInviare);
+    sendSMS(PrefissoInt + NumeroUtente1, TestoSmsDaInviare); // Invia a utente 1 come esempio
+    return; // Esci dalla funzione processSMS per evitare ulteriori elaborazioni
+  }
+
+
+
+
+
   // Cerca il PIN per la modifica dei numeri
   int pinIndex = sms.indexOf(Pin);
   if (pinIndex != -1) {
@@ -1581,7 +1653,8 @@ void processSMS(String sms) {
     }
   }
 }
-
+/*
+v1 lucio
 void sendSMS(String numero, String messaggio) {
   messaggio = ("#" + String(ContaSMS) + " " + messaggio);
   Serial.print(F("Invio SMS a: "));
@@ -1599,6 +1672,122 @@ void sendSMS(String numero, String messaggio) {
   Serial.print(F("ContaSMS incrementato a:"));
   Serial.println(ContaSMS);
   delay(5000);
+}*/
+
+/*
+v2 chatgpt
+void sendSMS(String numero, String messaggio) {
+  messaggio = "#" + String(ContaSMS) + " " + messaggio;
+
+  Serial.print(F("Invio SMS a: "));
+  Serial.println(numero);
+
+  // Invia il comando AT con numero, ma usando .c_str()
+  sim800.print(F("AT+CMGS=\""));
+  sim800.print(numero.c_str());  // meglio usare c_str()
+  sim800.println(F("\""));
+  delay(1000);  // attesa per il prompt '>'
+
+  // Invia il testo del messaggio
+  sim800.print(messaggio.c_str());  // usa c_str() per invio affidabile
+
+  // Termina con Ctrl+Z (ASCII 26)
+  sim800.write(26);
+  Serial.println(F("SMS inviato."));
+
+  // Aggiorna contatore
+  ContaSMS++;
+  writeContaSmsEEPROM(ContaSMS);
+  delay(300);
+  Serial.print(F("ContaSMS incrementato a: "));
+  Serial.println(ContaSMS);
+
+  delay(5000);  // attesa per stabilità del modulo
 }
+*/
+
+//v3 di chatgpt con risposta e gestione errore
+void sendSMS(String numero, String messaggio) {
+
+  // Aggiungi numero SMS e (opzionale) timestamp al testo
+  //TestoSmsDaInviare = "#" + String(ContaSMS) + "; " + TestoSmsDaInviare;
+  
+  Serial.print(F("Invio SMS a: "));
+  Serial.println(numero);
+  
 
 
+  Serial.print(F("TestoSmsDaInviare >>"));
+  Serial.print(TestoSmsDaInviare);
+  Serial.println("<<");
+
+
+  MessaggioSim = String(TestoSmsDaInviare);
+  //MessaggioSim = "#" + String(ContaSMS) + "; " + String(TestoSmsDaInviare);
+
+  Serial.print(F("MessaggioSim >>"));
+  Serial.print(MessaggioSim);
+  Serial.println("<<");  
+
+
+
+
+  bool DebugSms = false;
+
+  if (DebugSms){
+    Serial.println(F("___________DebugSms vale true quindi non mando sms"));
+  } else {
+
+
+
+    // Costruisci il comando AT+CMGS con c_str()
+    sim800.print(F("AT+CMGS=\""));
+    sim800.print(numero.c_str());
+    sim800.println(F("\""));
+
+    delay(1000);  // Attendi il prompt '>'
+
+    sim800.print(MessaggioSim.c_str());
+
+     //String(ContaSMS)
+    //sostituire il messaggisim con i valori di corrente ecc con tante print
+    sim800.write(26);  // Ctrl+Z per invio
+    Serial.println(F("Comando di invio SMS inviato, attendo risposta..."));
+
+    // Attesa risposta del modulo
+    unsigned long timeout = millis() + 10000; // max 10 secondi
+    String risposta = "";
+
+    while (millis() < timeout) {
+      if (sim800.available()) {
+        char c = sim800.read();
+        risposta += c;
+      }
+      
+      if (risposta.indexOf("OK") >= 0 || risposta.indexOf("+CMGS") >= 0) {
+        Serial.println(F("SMS inviato correttamente."));
+        break;
+      }
+      
+      if (risposta.indexOf("ERROR") >= 0) {
+        Serial.println(F("Errore durante l'invio dell'SMS!"));
+        Serial.println("Risposta modulo: " + risposta);
+        return;
+      }
+    }
+
+    if (risposta.length() == 0) {
+      Serial.println(F("Timeout: nessuna risposta dal modulo."));
+    }
+    // Incrementa contatore e salva
+    ContaSMS++;
+    writeContaSmsEEPROM(ContaSMS);
+    delay(300);
+    Serial.print(F("ContaSMS incrementato a: "));
+    Serial.println(ContaSMS);
+
+
+  }
+}  
+ 
+ //-----------------------------

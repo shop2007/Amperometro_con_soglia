@@ -1539,16 +1539,16 @@ void Azione22(){
   CreaTestoSmsValori();
   String Messaggio = String(TestoSmsUltimiDati);
   //sendSMS(PrefissoInt + NumeroUtente1, Messaggio);
-  messaggio continua a rimanere vuoto
+  //messaggio continua a rimanere vuoto
   Serial.print("Messaggio ");Serial.println(Messaggio);
 }
 //--------------------------------------------------------------------------
 void Azione23(){
-  processSMS("1992713332100000");//inserisce come numero 1 3332100000
+  processSMS("1992713332103169");//inserisce come numero 1 3332100000
 }
 //--------------------------------------------------------------------------
 void Azione24(){
-  processSMS("1992723472100000");//inserisce come numero 2 3472100000
+  processSMS("1992723297037940");//inserisce come numero 2 3472100000
 }
 //--------------------------------------------------------------------------
 void Azione25(){

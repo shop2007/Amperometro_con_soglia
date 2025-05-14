@@ -1,4 +1,5 @@
 String Versione = "amp-sogl-sms20";
+String MessaggioSim = " ";
 /*
 versione di sendsms proposta da chatgpt
 
@@ -77,7 +78,7 @@ const String PrefissoInt = "+39";
 const String Pin2 = "19999"; // "Azzera conta sms"
 const String Pin3 = "19988"; // Richiede status attuale
 
-char TestoSmsUltimiDati[100];  // spazio sufficiente per contenere tutti i dati
+char TestoSmsDaInviare[100];  // spazio sufficiente per contenere tutti i dati
 String NumeroUtente1;
 String NumeroUtente2;
 
@@ -552,8 +553,8 @@ void ControllaSogliaSuperata() {
 
         
         
-        //sendSMS(PrefissoInt + NumeroUtente1, TestoSmsUltimiDati);
-        //sendSMS(PrefissoInt + NumeroUtente2, TestoSmsUltimiDati);
+        //sendSMS(PrefissoInt + NumeroUtente1, TestoSmsDaInviare);
+        //sendSMS(PrefissoInt + NumeroUtente2, TestoSmsDaInviare);
          
 
       }
@@ -590,8 +591,8 @@ void CreaTestoSmsValori(){
 
 
 
-  snprintf(TestoSmsUltimiDati, sizeof(TestoSmsUltimiDati),
-         "V:%s I:%s Sogl:%s HigSec:%s TotSec:%u",
+  snprintf(TestoSmsDaInviare, sizeof(TestoSmsDaInviare),
+         "Volt:%s; Current:%s; Soglia:%s T.Err:%s TimeTot:%u",
          strVoltage,
          strCurrent,
          StrSogliaMilliampere,
@@ -600,7 +601,7 @@ void CreaTestoSmsValori(){
 
 
 
-  Serial.print("TestoSmsUltimiDati <<");Serial.print(TestoSmsUltimiDati);Serial.println(">>");
+  Serial.print("TestoSmsDaInviare <<");Serial.print(TestoSmsDaInviare);Serial.println(">>");
  
 }
 //---------------------------------------------------------
@@ -896,7 +897,7 @@ void TypeMenuList(void){
    Serial.println( F (" 23 Forza utente 1 3332100000"));
    Serial.println( F (" 24 Forza utente 2 3472100000"));
    Serial.println( F (" 25 Legge i numeri 1 e 2"));
-   Serial.println( F (" 26 TestoSmsUltimiDati"));
+   Serial.println( F (" 26 TestoSmsDaInviare"));
    
    Serial.println( F (" 99 Torna al loop senza reset"));
   
@@ -1292,16 +1293,16 @@ void Azione10(void){
 
 
   Serial.println(F("xxxxxxxxxxx Debug SMS allarme"));
-  Serial.println(TestoSmsUltimiDati);
+  Serial.println(TestoSmsDaInviare);
   Serial.println(F("xxxxxxxxxxx Debug SMS allarme"));
 
   if (InviaOraSms){
     InviaOraSms = false;
     Serial.println(F("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"));
     Serial.println(F("Simulazione SMS alarme"));
-    Serial.println(TestoSmsUltimiDati);
-    sendSMS(PrefissoInt + NumeroUtente1, TestoSmsUltimiDati);
-    //sendSMS(PrefissoInt + NumeroUtente2, TestoSmsUltimiDati);
+    Serial.println(TestoSmsDaInviare);
+    sendSMS(PrefissoInt + NumeroUtente1, TestoSmsDaInviare);
+    //sendSMS(PrefissoInt + NumeroUtente2, TestoSmsDaInviare);
 
 
 
@@ -1539,10 +1540,10 @@ void Azione21(){
 void Azione22(){
   //sendSMS(PrefissoInt + NumeroUtente2, "Test SMS utente 2");
   CreaTestoSmsValori();
-  String Messaggio = String(TestoSmsUltimiDati);
-  sendSMS(PrefissoInt + NumeroUtente1, Messaggio);
+  String Msg = String(TestoSmsDaInviare);
+  sendSMS(PrefissoInt + NumeroUtente1, Msg);
   //messaggio continua a rimanere vuoto
-  Serial.print("Messaggio ");Serial.println(Messaggio);
+  Serial.print("Azione22 Msg ");Serial.println(Msg);
 }
 //--------------------------------------------------------------------------
 void Azione23(){
@@ -1602,8 +1603,8 @@ void processSMS(String sms) {
     // Azzera il contatore in RAM
     Serial.print(F("Mando la situazione attuale "));
     CreaTestoSmsValori();
-    Serial.println(TestoSmsUltimiDati);
-    sendSMS(PrefissoInt + NumeroUtente1, TestoSmsUltimiDati); // Invia a utente 1 come esempio
+    Serial.println(TestoSmsDaInviare);
+    sendSMS(PrefissoInt + NumeroUtente1, TestoSmsDaInviare); // Invia a utente 1 come esempio
     return; // Esci dalla funzione processSMS per evitare ulteriori elaborazioni
   }
 
@@ -1696,54 +1697,85 @@ void sendSMS(String numero, String messaggio) {
 
 //v3 di chatgpt con risposta e gestione errore
 void sendSMS(String numero, String messaggio) {
+
   // Aggiungi numero SMS e (opzionale) timestamp al testo
   messaggio = "#" + String(ContaSMS) + " " + messaggio;
   
   Serial.print(F("Invio SMS a: "));
   Serial.println(numero);
+  
 
-  // Costruisci il comando AT+CMGS con c_str()
-  sim800.print(F("AT+CMGS=\""));
-  sim800.print(numero.c_str());
-  sim800.println(F("\""));
 
-  delay(1000);  // Attendi il prompt '>'
+  Serial.print(F("TestoSmsDaInviare >>"));
+  Serial.print(TestoSmsDaInviare);
+  Serial.println("<<");
 
-  sim800.print(messaggio.c_str());
-  sim800.write(26);  // Ctrl+Z per invio
-  Serial.println(F("Comando di invio SMS inviato, attendo risposta..."));
 
-  // Attesa risposta del modulo
-  unsigned long timeout = millis() + 10000; // max 10 secondi
-  String risposta = "";
+ MessaggioSim = String(TestoSmsDaInviare);
 
-  while (millis() < timeout) {
-    if (sim800.available()) {
-      char c = sim800.read();
-      risposta += c;
+ Serial.print(F("MessaggioSim >>"));
+  Serial.print(MessaggioSim);
+  Serial.println("<<");  
+
+
+
+
+  bool DebugSms = false;
+
+  if (DebugSms){
+    Serial.println(F("___________DebugSms vale true quindi non mando sms"));
+  } else {
+
+
+
+    // Costruisci il comando AT+CMGS con c_str()
+    sim800.print(F("AT+CMGS=\""));
+    sim800.print(numero.c_str());
+    sim800.println(F("\""));
+
+    delay(1000);  // Attendi il prompt '>'
+
+    sim800.print(MessaggioSim.c_str());
+
+     //String(ContaSMS)
+    //sostituire il messaggisim con i valori di corrente ecc con tante print
+    sim800.write(26);  // Ctrl+Z per invio
+    Serial.println(F("Comando di invio SMS inviato, attendo risposta..."));
+
+    // Attesa risposta del modulo
+    unsigned long timeout = millis() + 10000; // max 10 secondi
+    String risposta = "";
+
+    while (millis() < timeout) {
+      if (sim800.available()) {
+        char c = sim800.read();
+        risposta += c;
+      }
+      
+      if (risposta.indexOf("OK") >= 0 || risposta.indexOf("+CMGS") >= 0) {
+        Serial.println(F("SMS inviato correttamente."));
+        break;
+      }
+      
+      if (risposta.indexOf("ERROR") >= 0) {
+        Serial.println(F("Errore durante l'invio dell'SMS!"));
+        Serial.println("Risposta modulo: " + risposta);
+        return;
+      }
     }
-    if (risposta.indexOf("OK") >= 0 || risposta.indexOf("+CMGS") >= 0) {
-      Serial.println(F("SMS inviato correttamente."));
-      break;
+
+    if (risposta.length() == 0) {
+      Serial.println(F("Timeout: nessuna risposta dal modulo."));
     }
-    if (risposta.indexOf("ERROR") >= 0) {
-      Serial.println(F("Errore durante l'invio dell'SMS!"));
-      Serial.println("Risposta modulo: " + risposta);
-      return;
-    }
+    // Incrementa contatore e salva
+    ContaSMS++;
+    writeContaSmsEEPROM(ContaSMS);
+    delay(300);
+    Serial.print(F("ContaSMS incrementato a: "));
+    Serial.println(ContaSMS);
+
+
   }
-
-  if (risposta.length() == 0) {
-    Serial.println(F("Timeout: nessuna risposta dal modulo."));
-  }
-
-  // Incrementa contatore e salva
-  ContaSMS++;
-  writeContaSmsEEPROM(ContaSMS);
-  delay(300);
-  Serial.print(F("ContaSMS incrementato a: "));
-  Serial.println(ContaSMS);
-}
-
-
-
+}  
+ 
+ //-----------------------------

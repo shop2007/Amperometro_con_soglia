@@ -1,0 +1,7 @@
+Origine
+amp_sog_18.ino : funziona bene il menu
+testato_manda_sms_a_due_numeri_01.ino : funziona, forza i numeri in eeprom e manda 2 sms
+
+
+
+
