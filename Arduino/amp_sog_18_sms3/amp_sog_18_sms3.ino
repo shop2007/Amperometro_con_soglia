@@ -34,10 +34,15 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 
 //********************************************************************************************
 // PIN di accesso via SMS
-const String PinUtente1 = "11111"; // memorizza il numero chiamante come utente1
-const String PinUtente2 = "22222"; // memorizza il numero chiamante come utente2
-const String PinDati    = "12345"; // trasmette i dati di questo momento
-const String PinReset   = "88888"; // resetta tutto il sistema
+#define PinUtente1 "11111"
+#define PinUtente2 "22222"
+#define PinDati    "12345"
+#define PinReset   "88888"
+
+// memorizza il numero chiamante come utente1
+// memorizza il numero chiamante come utente2
+// trasmette i dati di questo momento
+// resetta tutto il sistema
 //********************************************************************************************
 // EEPROM indirizzi Numeri telefonici UTENTE1 UTENTE2 in EEPROM
 #define EEPROM_ADDR_NUM1 0
@@ -48,14 +53,15 @@ const int addrContaSms = 40; // Scegli un indirizzo che non si sovrapponga agli 
 
 //********************************************************************************************
 // Numeri telefonici UTENTE1 UTENTE2 in RAM
-String numero1 = "";
-String numero2 = "";
+String numero1 = "+393333333333";
+String numero2 = "+393333333333";
 //********************************************************************************************
 
 
 // Timer per ContaSecondi
 unsigned long ultimoMillis = 0;
-const unsigned long intervalloSecondi = 1000;
+//const unsigned long intervalloSecondi = 1000;
+#define intervalloSecondi 1000
 
 
 
@@ -69,12 +75,16 @@ bool BuzzerIsDisabled = false;  // se vale True il buzzer non suona
 //********************************************************************************************
 //Un potenziometro connesso all'ADC stabilisce il valore in milliAmpere di soglia
 //Taratura rispetto all'Hardware
-const int ValoreAdcSoglia1ampere = 0x03ff;  // Valore Adc Corrente Positiva 1 ampere, da tarare per interpolazione lineare
-const int ValoreAdcSoglia0ampere = 0x0;     // Valore Adc Corrente 0 Ampere, da tarare
+//const int ValoreAdcSoglia1ampere = 0x03ff;  // Valore Adc Corrente Positiva 1 ampere, da tarare per interpolazione lineare
+//const int ValoreAdcSoglia0ampere = 0x0;     // Valore Adc Corrente 0 Ampere, da tarare
+#define ValoreAdcSoglia1ampere 0x03ff
+  // Valore Adc Corrente Positiva 1 ampere, da tarare per interpolazione lineare
+#define ValoreAdcSoglia0ampere 0x0
+     // Valore Adc Corrente 0 Ampere, da tarare
 
 unsigned int adcValue ; //  valore dall'ADC
 
-float currentSensor;
+
 
 
 
@@ -183,13 +193,7 @@ void Azione16(void);
 void Azione17(void);
 void Azione18(void);
 void Azione19(void);
-void Azione20(void);
-void Azione21(void);
-void Azione22(void);
-void Azione23(void);
-void Azione24(void);
-void Azione25(void);
-void Azione26(void);
+
 void Azione99(void);
 void Menu(void);
 void WelcomeDisplay();
@@ -423,7 +427,7 @@ void BlinkWaitQ(void){
 //---------------------------------------------------------
 
 void ProcessaSensoreCorrente(unsigned int adcValue){
-
+  float currentSensor;
   // Calcola la tensione corrispondente al valore ADC
   Serial.print("AdcCurr=");Serial.print(adcValue);
   
@@ -700,20 +704,26 @@ void CheckMessaggiSMS(){
         Serial.print(F("numero: ")); Serial.println(numero);
         Serial.print(F("raw2: >")); Serial.print(raw);Serial.println("<");
 
+        String TempString ="xxxxx";
 
+        TempString = PinUtente1;
         if (raw.indexOf(PinUtente1) != -1) {
           Serial.println(F("Match PinUtente1"));
           numero1 = numero;
           writeStringToEEPROM(EEPROM_ADDR_NUM1, numero1);
           sendSMS(numero1, "Utente1 registrato correttamente.");
         }
-        else if (raw.indexOf(PinUtente2) != -1) {
+
+        TempString = PinUtente2;
+        if (raw.indexOf(TempString) != -1) {
           Serial.println(F("Match PinUtente2"));
           numero2 = numero;
           writeStringToEEPROM(EEPROM_ADDR_NUM2, numero2);
           sendSMS(numero2, "Utente2 registrato correttamente.");
         }
-        else if (raw.indexOf(PinDati) != -1) {
+
+        TempString = PinDati;
+        if (raw.indexOf(TempString) != -1) {
           Serial.println(F("Match PinDati"));
           CostruisciMsgDati();
           sendSMS(numero, String(msgdati));
@@ -725,14 +735,6 @@ void CheckMessaggiSMS(){
             delay(1000);
             Azione0(); //reset cpu
 
-            /*
-            Serial.println(F("Match PinReset"));
-            sendSMS(numero1, "Reset in corso...");
-            delay(1000);
-            sim800.println("AT+CFUN=1,1");
-            delay(1000);
-            resetCPU();
-            */
           
         }
       }
@@ -819,7 +821,7 @@ void setup() {
   sim800.begin(9600);
   delay(1000);
   Serial.println();
-  Serial.println( F ("|******   SISTEMA RESETTATO  ******|"));
+  Serial.println( F ("RESET"));
   Serial.println( F (" Sketch build xxxxx "));
   Serial.print( F ("Versione "));Serial.println(Versione);
   //
@@ -836,6 +838,9 @@ void setup() {
   // Recupera numeri telefonici da EEPROM
   numero1 = readStringFromEEPROM(EEPROM_ADDR_NUM1);
   numero2 = readStringFromEEPROM(EEPROM_ADDR_NUM2);
+
+  Serial.print(F("Numero Utente1: ")); Serial.println(numero1);
+  Serial.print(F("Numero Utente2: ")); Serial.println(numero2);
 
   // Legge il contatore SMS da EEPROM e lo scrive in ContaSMS
   ContaSMS = readContaSmsEEPROM();
@@ -889,6 +894,8 @@ void TypeMenuList(void){
     Serial.println();
     Serial.println( F ("|*******************************************"));
     Serial.println( F ("|             ʘ‿ʘ   Menù   (◡_◡)          "));
+
+    /*
       Serial.print( F ("|  Ver. "));Serial.println(Versione);
     Serial.println( F ("|*******************************************"));
     Serial.println( F ("  0 Reset sim e cpu"));
@@ -928,6 +935,7 @@ void TypeMenuList(void){
    Serial.println( F (" 22 Manda sms prova utente 2"));
    Serial.println( F (" 23 legge numeri 1 e 2"));
    Serial.println( F (" 99 Torna al loop senza reset"));
+   */
   
 }
 //xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
@@ -1059,40 +1067,6 @@ void Menu() {
         //     swap debug;
         Azione19();
       break;
-      //-------------------------------------------------
-      case 20:
-        //     swap debug;
-        Azione20();
-      break;
-      //-------------------------------------------------
-      //-------------------------------------------------
-      case 21:
-        //     swap debug;
-        Azione21();
-      break;
-      //-------------------------------------------------
-      //-------------------------------------------------
-      case 22:
-        //     swap debug;
-        Azione22();
-      break;
-      //-------------------------------------------------
-      //-------------------------------------------------
-      case 23:
-        //     swap debug;
-        Azione23();
-      break;
-      //-------------------------------------------------
-      //-------------------------------------------------
-      case 24:
-        //     swap debug;
-        Azione24();
-      break;
-      //-------------------------------------------------
-
-
-
-
       case 99:
         Azione99();
       break;
@@ -1166,6 +1140,8 @@ void Azione3(void){
     ProcessaPotenziometroSoglia(i);
   } 
 }
+
+//-----------------------------------------------
 
 void Azione4(void){
   //usa la funzione  ProcessaPotenziometroSoglia
@@ -1488,57 +1464,6 @@ void Azione19(void){
 
 //--------------------------------------------------------------------------
 
-void Azione20(){
-  const int startPin = 2;  // Primo pin digitale disponibile
-  const int endPin = 13;  // Ultimo pin digitale disponibile
-
-  Serial.println("Testa gli outut a rotazione (solo quelli configuati)... q termina");
-
-  ClearSerialBuffer();
-  while (true) {
-    //Serial.print(".");
-    // Controlla se c'è un dato disponibile sulla seriale
-    if (Serial.available() > 0) {
-      char receivedChar = Serial.read(); // Legge il carattere inviato via seriale
-      if (receivedChar == 'Q' || receivedChar == 'q') {
-        Serial.println("Interruzione della lettura.");
-        break; // Esce dal ciclo e dalla funzione
-      }
-
-
-    }
-    Serial.println();
-    for (int pin = startPin; pin <= endPin; pin++) {
-        digitalWrite(pin, HIGH); // Accendi il pin corrente
-        delay(250);        // Aspetta per 200 ms
-        digitalWrite(pin, LOW);  // Spegni il pin corrente
-        Serial.print(f(" D"));Serial.print(pin);
-    }
-  }
-}
-
-
-//-----------------------------------------------------
-void Azione21(){
-  Serial.println(F("Messaggio di prova per utente1"));
-  sendSMS(numero1, "Messaggio di prova utrente1");
-}
-//-----------------------------------------------------
-void Azione22(){
-  Serial.println(F("Messaggio di prova per utente2"));
-  sendSMS(numero2, "Messaggio di prova utrente2");
-}
-//-----------------------------------------------------
-void Azione23(){
-  //legge numeri 1 e 2
-  Serial.print(F("Numero Utente1: ")); Serial.println(numero1);
-  Serial.print(F("Numero Utente2: ")); Serial.println(numero2);
-
-}
-//-----------------------------------------------------
-void Azione24(){
-  
-}
 
 
 
