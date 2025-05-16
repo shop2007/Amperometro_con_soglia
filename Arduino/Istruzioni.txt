@@ -1,0 +1,9 @@
+Quando manda sms o lo riceve accende il led bianco
+provare senza sim
+PinUtente1 "11111"
+PinUtente2 "22222"
+PinDati    "12345"
+PinReset   "88888"
+DeleteUtente2 "00002"
+
+Se la sim è connessa blinka ogni 3 secondi

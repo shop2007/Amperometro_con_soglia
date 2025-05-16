@@ -1,4 +1,4 @@
-String Versione = "test_sim5";
+String Versione = "test_sim8";
 #include <Wire.h>
 #include "LiquidCrystal_I2C.h"
 #include <EEPROM.h>
@@ -14,6 +14,7 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 #define PinUtente2 "22222"
 #define PinDati    "12345"
 #define PinReset   "88888"
+#define DeleteUtente2 "00002"
 
 //********************************************************************************************
 // EEPROM indirizzi Numeri telefonici UTENTE1 UTENTE2 in EEPROM
@@ -21,12 +22,18 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 #define EEPROM_ADDR_NUM2 20
 // Indirizzo EEPROM per il contatore SMS
 const int addrContaSms = 40; // Scegli un indirizzo che non si sovrapponga agli altri
+bool PrimoSmsDaTrasmettere = true; // appena viene trasmesso il primo sms di allarme si mette false
+//********************************************************************************************
+bool SimulaSensCurrPotenziom = true; //se true usa i valori del potenziometro al posto di quello dei sensori
+bool LcdPresent = true; //se presente lcd
+bool SimulaTensionePotenziom = true; //se true usa lettura potenziometro al posto della tensione
 
+bool StampaOgniSecondoAbilitata = false;
 //********************************************************************************************
 
 // Numeri registrati
-String numero1 = "";
-String numero2 = "";
+String numero1 = "+393333333333";
+String numero2 = "+393477777777";
 
 // Variabili per il messaggio
 char msgdati[100];
@@ -46,9 +53,8 @@ unsigned long ultimoMillis = 0;
 //const unsigned long intervalloSecondi = 1000;
 #define intervalloSecondi 1000
 
-bool debug = false;
 
-bool DebugOn=false; //se true usa i valori del potenziometro al posto di quello dei sensori
+
 int buttonState = 0;  // variable for reading the pushbutton status
 bool BuzzerIsDisabled = false;  // se vale True il buzzer non suona
 //********************************************************************************************
@@ -94,11 +100,13 @@ int noteDuration = 500; //durata delle note
 
 //*******************************************************
 void WelcomeDisplay(){
-    lcd.setCursor(0, 0); // Posiziona il cursore sulla seconda riga, prima colonna
-    lcd.print("Welcome ");
+    if (LcdPresent){
+      lcd.setCursor(0, 0); // Posiziona il cursore sulla seconda riga, prima colonna
+      lcd.print("Welcome ");
 
-    lcd.setCursor(0, 1); // Posiziona il cursore sulla seconda riga, prima colonna
-    lcd.print(Versione);
+      lcd.setCursor(0, 1); // Posiziona il cursore sulla seconda riga, prima colonna
+      lcd.print(Versione);
+    }
 }
 
 //************************
@@ -109,7 +117,6 @@ void writeContaSmsEEPROM(int value) {
   EEPROM.put(addrContaSms, value);
   Serial.print(F("Scritto in EEPROM ContaSmsEEprom indirizzo "));
   Serial.print(addrContaSms);
-  Serial.print("");
   Serial.print(F(" Valore "));
   Serial.println(value);
 
@@ -170,17 +177,19 @@ void playTone(int frequency, int duration) {
   snprintf(StrSogliaMilliampere, sizeof(StrSogliaMilliampere), "%4d", intSogliaMilliampere);
 
   // Stampa i risultati sul monitor seriale
-  Serial.print("ADC letto (hex): 0x");
-  Serial.print(valoreAdcLetto, HEX); // Stampa il valore ADC in esadecimale
+  if (StampaOgniSecondoAbilitata){
+    Serial.print(F("ADC letto (hex): 0x"));
+    Serial.print(valoreAdcLetto, HEX); // Stampa il valore ADC in esadecimale
 
-  Serial.print(" - Float Soglia (mA): ");
-  Serial.print(FloatSogliaMilliampere); // Stampa lo scostamento in decimale
+    Serial.print(F(" - Float Soglia (mA): "));
+    Serial.print(FloatSogliaMilliampere); // Stampa lo scostamento in decimale
 
-  Serial.print(" - int Soglia (mA): ");
-  Serial.print(intSogliaMilliampere); // Stampa lo scostamento in decimale
+    Serial.print(F(" - int Soglia (mA): "));
+    Serial.print(intSogliaMilliampere); // Stampa lo scostamento in decimale
 
-  Serial.print(" - Strings Soglia (mA): ");
-  Serial.println(StrSogliaMilliampere); // Stampa lo scostamento in decimale
+    Serial.print(F(" - Strings Soglia (mA): "));
+    Serial.println(StrSogliaMilliampere); // Stampa lo scostamento in decimale
+  }
  }
 
 
@@ -191,15 +200,16 @@ void playTone(int frequency, int duration) {
 void ProcessaSensoreCorrente(unsigned int adcValue){
   float currentSensor;
   // Calcola la tensione corrispondente al valore ADC
-  Serial.print("AdcCurr=");Serial.print(adcValue);
-  
+
   float floatVoltageSensore = adcValue * (5.0 / 1023.0);
-  Serial.print(" - floatVoltageSensore=");Serial.print(floatVoltageSensore);
 
   // Calcola lo scostamento in bit dallo zero (2.5V)
   int deltaBit = adcValue - 512; // 512 è il valore ADC corrispondente a 2.5V
-  Serial.print(" - deltaBit=");Serial.print(deltaBit);
-
+  if (StampaOgniSecondoAbilitata){
+    Serial.print(F("AdcCurr="));Serial.print(adcValue);
+    Serial.print(F(" - floatVoltageSensore="));Serial.print(floatVoltageSensore);   
+    Serial.print(F(" - deltaBit="));Serial.print(deltaBit);
+  }
   // Interpolazione lineare tra i punti dati:
   // (2.07V, -350mA) e (2.5V, 0mA)
   // (2.5V, 0mA) e (3.06V, +450mA)
@@ -210,13 +220,11 @@ void ProcessaSensoreCorrente(unsigned int adcValue){
   } else {
     // Calcola la corrente per valori di tensione > 2.5V
     currentSensor = mapFloat(floatVoltageSensore, 2.5, 3.06, 0.0, 450.0);
-  }
-  Serial.print(" - currentSensor=");Serial.print(currentSensor);
+  }  
 
     // Approssima il float al numero intero più vicino
   intCurrent = static_cast<int>(round(currentSensor));
-  Serial.print(" - intCurrent=");Serial.print(intCurrent);
-
+  
   // Usa snprintf per formattare la stringa
   // '%+5d' assicura che il numero sia allineato a destra con segno
   snprintf(strCurrent, sizeof(strCurrent), "%+5d", intCurrent);
@@ -229,8 +237,11 @@ void ProcessaSensoreCorrente(unsigned int adcValue){
   */
 
   // Stampa il risultato
-  Serial.print(" - strCurrent='");  Serial.print(strCurrent); Serial.println("'");
-
+  if (StampaOgniSecondoAbilitata){
+    Serial.print(F(" - currentSensor="));Serial.print(currentSensor);
+    Serial.print(F(" - intCurrent="));Serial.print(intCurrent);
+    Serial.print(F(" - strCurrent='"));  Serial.print(strCurrent); Serial.println(F("'"));
+  }
 
 
 
@@ -245,12 +256,16 @@ float mapFloat(float x, float in_min, float in_max, float out_min, float out_max
 void ControllaSogliaSuperata() {
 
   intCurrent = abs(intCurrent); // toglie il segno
-  Serial.println("intCurrent="); Serial.print(intCurrent);
-  Serial.println(" - Soglia="); Serial.print(intSogliaMilliampere);
+  if (StampaOgniSecondoAbilitata){
+    Serial.print(F("intCurrent=")); Serial.println(intCurrent);
+    Serial.print(F(" - Soglia=")); Serial.println(intSogliaMilliampere);
+  }
 
   // Controllo della corrente rispetto alla soglia
   if (intCurrent < intSogliaMilliampere) {
-      Serial.println(" - Corrente inferiore soglia");
+      if (StampaOgniSecondoAbilitata){
+        Serial.println(F(" - Corrente inferiore soglia"));
+      }
       // Se la corrente è inferiore alla soglia
       digitalWrite(Buzzer, LOW); // Spegne il Tone
       digitalWrite(Rele_Contatto, LOW); // Stacca il relay
@@ -262,11 +277,24 @@ void ControllaSogliaSuperata() {
       Led_verde_off();
       
   } else {
-      Serial.println(" - Corrente SUPERIORE soglia");
+      if (StampaOgniSecondoAbilitata){
+        Serial.println(F(" - Corrente SUPERIORE soglia"));
+      }
       // Se la corrente è maggiore o uguale alla soglia
       digitalWrite(Rele_Contatto, HIGH); // Alimenta il relay
       digitalWrite(Rele_Buzzer, HIGH); // Alimenta il relay
       ContaSecondiCorrenteElevata++;
+
+      //Si trasmette sms solo una volta
+      if (PrimoSmsDaTrasmettere){
+        PrimoSmsDaTrasmettere = false; // non se ne manderà un altro
+        Serial.println(F("Trasmissione primo sms in corso"));
+          CostruisciMsgDati();
+          sendSMS(numero1, String(msgdati));
+          sendSMS(numero2, String(msgdati));
+      }
+      
+
 
       if (ContaSecondi % 2 == 0) {
         playTone(NOTE_MI, 500);
@@ -302,18 +330,10 @@ void ProcessaAdcTensione(unsigned int adcValue) {
   // Interpolazione lineare tra i punti dati:
   // (20 bit, 2V) e (500 bit, 12V)  floatVoltage = mapFloat2(adcValue, 20, 500, 2.0, 12.0);
   // nuovo partitore 5,05v 211bit e 12.0v 535bit
-
-  Serial.print("adcValue="); Serial.print(adcValue);
-
   floatVoltage = mapFloat2(adcValue, 211, 535, 5.05, 12.0);
-  Serial.print(" - floatVoltage="); Serial.print(floatVoltage);
-
-
-
 
   // Approssima il valore a una cifra decimale
   float roundedVoltage = round(floatVoltage * 10.0) / 10.0;
-  Serial.print(" - roundedVoltage="); Serial.print(roundedVoltage);
 
   // Converte il valore approssimato in una stringa temporanea
   char tempStr[6]; // Buffer temporaneo leggermente più grande per la conversione
@@ -329,11 +349,18 @@ void ProcessaAdcTensione(unsigned int adcValue) {
       }
   }
 
-    // Copia la stringa nel buffer finale allineata a destra
-    snprintf(strVoltage, 5, "%4s", tempStr);
-  Serial.print(" - strVoltage="); Serial.print(strVoltage);
+  // Copia la stringa nel buffer finale allineata a destra
+  snprintf(strVoltage, 5, "%4s", tempStr);
 
-  Serial.println();
+  if (StampaOgniSecondoAbilitata){
+    Serial.print(F("adcValue=")); Serial.print(adcValue);
+    Serial.print(F(" - floatVoltage=")); Serial.print(floatVoltage);
+    Serial.print(F(" - roundedVoltage=")); Serial.print(roundedVoltage);
+    Serial.print(F(" - strVoltage=")); Serial.print(strVoltage);
+    Serial.println();
+  }
+
+  
 
 }
 
@@ -343,61 +370,7 @@ void ProcessaAdcTensione(unsigned int adcValue) {
 
 //-----------------------------------------------
 
-void Azione4(void){
-  //usa la funzione  ProcessaPotenziometroSoglia
 
-  //legge l'AD connesso al ptenziometro
-  int valoreAnalogico = analogRead(AdcPotenziometro);
-
-  // lo converte
-  ProcessaPotenziometroSoglia(valoreAnalogico);
-
-  // lo manda al display LCD riga 1 posizione 12
-  lcd.setCursor(8, 0); // Posiziona il cursore sulla prima riga, colonna 1
-  lcd.print(" SmA");
-
-  lcd.setCursor(12, 0); // Posiziona il cursore sulla prima riga, colonna 1
-  lcd.print(StrSogliaMilliampere);
-}
-
-//-----------------------------------------------
-void Azione5(void){
-  //prova la funzione di conversione del sensore di corrente in valore di corrente
-  //Nano ha un ADC da 10 bit, range 0-1023
-  for (int i =0 ; i<1023;i++){
-    i=i+16;
-    adcValue = i;
-    ProcessaSensoreCorrente(adcValue);
-  } 
-}
-
-//----------------------------------------------------
-
-void Azione6(void){
-/*
-  #define AdcSensorCurrent A2
-  #define AdcVoltageBattery A3
-  #define AdcPotenziometro A7
-*/
-  if(debug){
-    //in debug legge l'AD connesso al potenziometro
-    adcValue = analogRead(AdcPotenziometro);
-  } else {
-    //run time legge l'AD connesso al sensore corrente
-    adcValue = analogRead(AdcSensorCurrent);    
-  }
-
-  ProcessaSensoreCorrente(adcValue);
-
-  // lo manda al display LCD riga 1 posizione 12
-  lcd.setCursor(0, 0); // Posiziona il cursore sulla prima riga, colonna 1
-  lcd.print("ImA=");
-
-  lcd.setCursor(3, 0); // Posiziona il cursore sulla prima riga, colonna 1
-  lcd.print(strCurrent);
-
-
-}
 
 
 
@@ -417,67 +390,18 @@ void Azione7(void){
 
 void Azione8(void){
 
-/*
-  #define AdcSensorCurrent A2
-  #define AdcVoltageBattery A3
-  #define AdcPotenziometro A7
-*/
-
-  if(debug){
-    //in debug legge l'AD connesso al potenziometro
-    adcValue = analogRead(AdcPotenziometro);
-  } else {
-    //run time legge l'AD connesso al sensore tensione
-    adcValue = analogRead(AdcVoltageBattery);    
-  }
-
-  ProcessaAdcTensione(adcValue);
-
-  // lo manda al display LCD riga 1 posizione 12
-  lcd.setCursor(0, 1); // Posiziona il cursore sulla prima riga, colonna 1
-  lcd.print("Volt");
-
-  lcd.setCursor(4, 1); // Posiziona il cursore sulla prima riga, colonna 1
-  lcd.print(strVoltage);
-
-
 }
 //-----------------------------------------------
 
 
 void Azione9(void){
 
-  //test button
-  buttonState = digitalRead(buttonPin);
-
-  // check if the pushbutton is pressed. If it is, the buttonState is HIGH:
-  if (buttonState == LOW) {
-    Serial.println("Button premuto");
-    ContaSecondiCorrenteElevata=0;
-  } else {
-    // turn LED off:
-    Serial.println("Button rilasciato");
-  }
-  
 
 }
 //-----------------------------------------------
 
 void Azione10(void){
   //legge l'AD connesso al ptenziometro
-  
-  ControllaSogliaSuperata();
-  if(ContaSecondiCorrenteElevata>9999){
-    ContaSecondiCorrenteElevata=9999; //satura a 9999
-  }
-  sprintf(strContaSecondiCorrenteElevata, "%04u", ContaSecondiCorrenteElevata);
-
-  // lo manda al display LCD riga 1 posizione 12
-  lcd.setCursor(8, 1); // Posiziona il cursore sulla prima riga, colonna 1
-  lcd.print(" Err");
-
-  lcd.setCursor(12, 1); // Posiziona il cursore sulla prima riga, colonna 1
-  lcd.print(strContaSecondiCorrenteElevata);
 
 
 }
@@ -564,17 +488,29 @@ void setup() {
   Serial.begin(115200);
   sim800.begin(9600);
   delay(1000);
-  Serial.println("RESET");
+  Serial.println(F("RESET"));
   Serial.print(F("Nome file: "));
   Serial.println(__FILE__);
 
   Serial.println();
+  
+  if(SimulaSensCurrPotenziom){
+    Serial.println(F("OFF = ADC reali"));
+  } else {
+    Serial.println(F("ON = ADC su potenz."));
+  }
 
-  lcd.begin();          // Inizializza il display
-  lcd.backlight();     // Accende la retroilluminazione
+  if (LcdPresent){
+    Serial.println(F("lcd present"));
 
-  WelcomeDisplay();
+    lcd.begin();          // Inizializza il display
+    lcd.backlight();     // Accende la retroilluminazione
 
+    WelcomeDisplay();
+  } else
+  {
+    Serial.println(F("NO lcd"));
+  }
   // Recupera numeri telefonici da EEPROM
   numero1 = readStringFromEEPROM(EEPROM_ADDR_NUM1);
   numero2 = readStringFromEEPROM(EEPROM_ADDR_NUM2);
@@ -596,7 +532,7 @@ void setup() {
   buttonState = digitalRead(buttonPin);
   if (buttonState == LOW){
     BuzzerIsDisabled=true;
-    Serial.println("Buzzer disabilitato");
+    Serial.println(F("Buzzer disabilitato"));
     SirenaFranceseVeloce();
   }
 
@@ -606,23 +542,26 @@ void setup() {
 
 
 void loop() {
-
+  
+/*
+void LetturaAnalogiche(){
   Azione4(); //soglia potenziometro
   Azione6(); //legge corrente sensore
   Azione8(); //legge tensione batteria
   Azione9(); //legge button, se premuto azzera ContaSecondiCorrenteElevata
-
-
   Azione10(); //compara corrente sensore con soglia potenziometro
   Serial.print(" - ContaSecondiCorrenteElevata= ");Serial.println(ContaSecondiCorrenteElevata);
-
-
-
+}
+*/
+  LetturaAnalogiche();
   // Incrementa ContaSecondi ogni secondo
   if (millis() - ultimoMillis >= intervalloSecondi) {
     ultimoMillis = millis();
     ContaSecondi++;
-    Serial.print(ContaSecondi);Serial.print( " ");
+    StampaOgniSecondoAbilitata = true; //abilita le stampe di debug, ma solo ogni secondo
+    
+    Serial.println();
+    Serial.println(ContaSecondi);
     if (ContaSecondi % 50 == 0) {
       //va acapo per non sforare con il terminale
       Serial.println();
@@ -633,30 +572,30 @@ void loop() {
   if (sim800.available()) {
     String raw = sim800.readString();
     raw.trim();
-    Serial.print("raw: >"); Serial.print(raw);Serial.println("<");
+    Serial.print(F("raw: >")); Serial.print(raw);Serial.println(F("<"));
 
     if (raw.indexOf("+CMT:") != -1) {
       int msgStart = raw.indexOf("\n", raw.indexOf("\n") + 1);
-      Serial.print("msgStart: ");Serial.println(msgStart);
+      Serial.print(F("msgStart: "));Serial.println(msgStart);
       String contenuto = "";
       if (msgStart != -1) {
           contenuto = raw.substring(msgStart);
           contenuto.trim(); // ✅ CORRETTO
-          Serial.print("contenuto: "); Serial.println(contenuto);
+          Serial.print(F("contenuto: ")); Serial.println(contenuto);
       }
 
       int index = raw.indexOf("+39");
       if (index != -1) {
         String numero = raw.substring(index, index + 13);
-        Serial.print("numero: "); Serial.println(numero);
-        Serial.print("raw2: >"); Serial.print(raw);Serial.println("<");
+        Serial.print(F("numero: ")); Serial.println(numero);
+        Serial.print(F("raw2: >")); Serial.print(raw);Serial.println(F("<"));
 
 
         String TempString ="xxxxx";
 
         TempString = PinUtente1;
         if (raw.indexOf(TempString) != -1) {
-          Serial.println("Match PinUtente1");
+          Serial.println(F("Match PinUtente1="));
           numero1 = numero;
           writeStringToEEPROM(EEPROM_ADDR_NUM1, numero1);
           sendSMS(numero1, "Utente1 registrato correttamente.");
@@ -664,22 +603,30 @@ void loop() {
 
         TempString = PinUtente2;
         if (raw.indexOf(TempString) != -1) {
-          Serial.println("Match PinUtente2");
+          Serial.println(F("Match PinUtente2"));
           numero2 = numero;
           writeStringToEEPROM(EEPROM_ADDR_NUM2, numero2);
           sendSMS(numero2, "Utente2 registrato correttamente.");
         }
 
+        TempString = DeleteUtente2;
+        if (raw.indexOf(TempString) != -1) {
+          Serial.println(F("Match DeleteUtente2"));
+          numero2 = "+39";
+          writeStringToEEPROM(EEPROM_ADDR_NUM2, numero2);
+          sendSMS(numero1, "Utente2 cancellato correttamente.");
+        }
+
         TempString = PinDati;
         if (raw.indexOf(TempString) != -1) {
-          Serial.println("Match PinDati");
+          Serial.println(F("Match PinDati"));
           CostruisciMsgDati();
           sendSMS(numero, String(msgdati));
         }
 
         TempString = PinReset;
         if (raw.indexOf(TempString) != -1) {
-            Serial.println("Match PinReset");
+            Serial.println(F("Match PinReset"));
             sendSMS(numero1, "Reset in corso...");
             delay(1000);
             sim800.println("AT+CFUN=1,1");
@@ -689,24 +636,12 @@ void loop() {
       }
     }
   }
-
-  /*
-  // Gestione pulsante per invio dati
-  bool statoCorrente = digitalRead(pulsantePin);
-  if (statoPrecedente == HIGH && statoCorrente == LOW) {
-    CostruisciMsgDati();
-    if (numero1.length() == 13) sendSMS(numero1, String(msgdati));
-    if (numero2.length() == 13) sendSMS(numero2, String(msgdati));
-    delay(200); // debounce
-  }
-  statoPrecedente = statoCorrente;
-  */
 }
 
 // Crea msgdati con tutte le variabili
 void CostruisciMsgDati() {
   snprintf(msgdati, sizeof(msgdati),
-           "SMS:%d SOGL:%smA CUR:%smA SEC:%s V:%s TSEC:%u",
+           "SMS:%d Soglia:%smA Current:%smA Time.alarm:%s Volt:%s Time.tot:%u",
            ContaSMS,
            StrSogliaMilliampere,
            strCurrent,
@@ -731,12 +666,14 @@ void sendSMS(String numero, String messaggio) {
       char c = sim800.read();
       risposta += c;
       if (risposta.indexOf("+CMGS:") != -1) {
-        Serial.println("SMS inviato con successo a " + numero);
+        Serial.print(F("SMS inviato con successo a "));
+        Serial.println(numero);
         return;
       }
     }
   }
-  Serial.println("ERRORE: invio SMS fallito verso " + numero);
+  Serial.print(F("ERRORE: invio SMS fallito verso "));
+  Serial.println(numero);
 }
 
 // EEPROM - scrittura
@@ -766,3 +703,121 @@ void resetCPU() {
   Riavvia();
 }
 
+//*******************************************************************************
+void LetturaAnalogiche(){
+
+//**********
+  //Azione4(); //soglia potenziometro
+  //usa la funzione  ProcessaPotenziometroSoglia
+
+  //legge l'AD connesso al ptenziometro
+  int valoreAnalogico = analogRead(AdcPotenziometro);
+
+  // lo converte
+  ProcessaPotenziometroSoglia(valoreAnalogico);
+
+  // lo manda al display LCD riga 1 posizione 12
+  if (LcdPresent){
+  
+    lcd.setCursor(8, 0); // Posiziona il cursore sulla prima riga, colonna 1
+    lcd.print(" SmA");
+
+    lcd.setCursor(12, 0); // Posiziona il cursore sulla prima riga, colonna 1
+    lcd.print(StrSogliaMilliampere);
+
+  }
+//**********
+  //Azione6(); //legge corrente sensore
+/*
+  #define AdcSensorCurrent A2
+  #define AdcVoltageBattery A3
+  #define AdcPotenziometro A7
+*/
+  if(SimulaSensCurrPotenziom){
+    //in debug legge l'AD connesso al potenziometro
+    adcValue = analogRead(AdcPotenziometro);
+  } else {
+    //run time legge l'AD connesso al sensore corrente
+    adcValue = analogRead(AdcSensorCurrent);    
+  }
+
+  ProcessaSensoreCorrente(adcValue);
+
+  // lo manda al display LCD riga 1 posizione 12
+  if (LcdPresent){
+    lcd.setCursor(0, 0); // Posiziona il cursore sulla prima riga, colonna 1
+    lcd.print("ImA=");
+
+    lcd.setCursor(3, 0); // Posiziona il cursore sulla prima riga, colonna 1
+    lcd.print(strCurrent);
+  }  
+//**********  
+  //Azione8(); //legge tensione batteria
+/*
+  #define AdcSensorCurrent A2
+  #define AdcVoltageBattery A3
+  #define AdcPotenziometro A7
+*/
+
+  if(SimulaTensionePotenziom){
+    //in SimulaTensionePotenziom legge l'AD connesso al potenziometro
+    adcValue = analogRead(AdcPotenziometro);
+  } else {
+    //run time legge l'AD connesso al sensore tensione
+    adcValue = analogRead(AdcVoltageBattery);    
+  }
+
+  ProcessaAdcTensione(adcValue);
+
+  // lo manda al display LCD riga 1 posizione 12
+  if (LcdPresent){
+    lcd.setCursor(0, 1); // Posiziona il cursore sulla prima riga, colonna 1
+    lcd.print("Volt");
+
+    lcd.setCursor(4, 1); // Posiziona il cursore sulla prima riga, colonna 1
+    lcd.print(strVoltage);
+  }
+
+
+//**********  
+  //Azione9(); //legge button, se premuto azzera ContaSecondiCorrenteElevata
+  //test button
+  buttonState = digitalRead(buttonPin);
+
+  // check if the pushbutton is pressed. If it is, the buttonState is HIGH:
+  if (buttonState == LOW) {
+    Serial.println(F("Button premuto"));
+    ContaSecondiCorrenteElevata=0;
+  } else {
+    // turn LED off:
+    if (StampaOgniSecondoAbilitata){
+      Serial.println(F("Button rilasciato"));
+    }
+    
+  }
+  
+
+//**********  
+  //Azione10(); //compara corrente sensore con soglia potenziometro
+  
+  ControllaSogliaSuperata();
+  if(ContaSecondiCorrenteElevata>9999){
+    ContaSecondiCorrenteElevata=9999; //satura a 9999
+  }
+  sprintf(strContaSecondiCorrenteElevata, "%04u", ContaSecondiCorrenteElevata);
+
+  // lo manda al display LCD riga 1 posizione 12
+  if (LcdPresent){
+    lcd.setCursor(8, 1); // Posiziona il cursore sulla prima riga, colonna 1
+    lcd.print(" Err");
+
+    lcd.setCursor(12, 1); // Posiziona il cursore sulla prima riga, colonna 1
+    lcd.print(strContaSecondiCorrenteElevata);
+  }
+
+  if (StampaOgniSecondoAbilitata){
+    Serial.print(F(" - Conta_Secondi_Corrente_Elevata= "));Serial.println(ContaSecondiCorrenteElevata);
+  }
+  StampaOgniSecondoAbilitata = false; //questa era l'ultima stampa di debug
+//**********
+}
