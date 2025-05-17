@@ -1,9 +1,14 @@
-Quando manda sms o lo riceve accende il led bianco
-provare senza sim
-PinUtente1 "11111"
-PinUtente2 "22222"
-PinDati    "12345"
-PinReset   "88888"
-DeleteUtente2 "00002"
+All'avvio il led bianco lampeggia alcune volte velocemente in attesa della SIM.
+La sim tenta di connettersi alla rete cellulare e lampeggia velocemente. Quando è connessa lampeggia una volta ogni tre secondi.
+Quando manda sms o lo riceve, accende il led bianco
+
+
+file amp_sog_19_sms10
+Comandi da inviare via SMS da qualsiasi telefono (attento alle Maiuscole-Minuscole). Riceve SMS di risposta "Utentex registrato correttamente"
+User1 - mette il numero ricevuto come utente principale da avvisare su allarmi. Riceve SMS di risposta "Utentex registrato correttamente"
+User2 - mette il numero ricevuto come utente 2 da avvisare su allarmi
+Statoattuale  - trasmette i valori sul display in quel momento 
+Resetsystem - resetta da remoto il sistema e il conta allarmi
+DeleteUtente2 - resta attivo per avviso allarme solo utente principale. Riceve risposta "Utente 2 cancellato"
 
 Se la sim è connessa blinka ogni 3 secondi

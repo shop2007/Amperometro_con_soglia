@@ -1,4 +1,6 @@
-String Versione = "amp_sog_19_sms08";
+String Versione = "amp_sog_19_sms10";
+/*
+SMS partono solo con pc connesso alla USB, ritardo partenza Serial.Software*/
 #include <Wire.h>
 #include "LiquidCrystal_I2C.h"
 #include <EEPROM.h>
@@ -10,11 +12,11 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 
 //********************************************************************************************
 // PIN di accesso via SMS
-#define PinUtente1 "11111"
-#define PinUtente2 "22222"
-#define PinDati    "12345"
-#define PinReset   "88888"
-#define DeleteUtente2 "00002"
+#define PinUtente1 "User1"
+#define PinUtente2 "User2"
+#define PinDati    "Statoattuale"
+#define PinReset   "Resetsystem"
+#define DeleteUtente2 "eleteuser2"
 
 //********************************************************************************************
 // EEPROM indirizzi Numeri telefonici UTENTE1 UTENTE2 in EEPROM
@@ -52,6 +54,7 @@ unsigned int ContaSecondiCorrenteElevata = 0;
 unsigned long ultimoMillis = 0;
 //const unsigned long intervalloSecondi = 1000;
 #define intervalloSecondi 1000
+
 
 
 
@@ -487,8 +490,7 @@ void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
 
   Serial.begin(115200);
-  sim800.begin(9600);
-  delay(1000);
+ 
   Serial.println(F("RESET"));
   Serial.print(F("Nome file: "));
   Serial.println(__FILE__);
@@ -523,6 +525,18 @@ void setup() {
   ContaSMS = readContaSmsEEPROM();
   Serial.print(F("ContaSMS dopo reset:"));
   Serial.println(ContaSMS);
+  delay(1000);
+  sim800.begin(9600);
+  //ritardo perchè la sim senza usb connessa parte dopo
+  for (int i = 1; i < 8; i++) {
+    Led_bianco_on();
+    delay (100);
+    Led_bianco_off();
+    delay(900);
+  }
+  //delay(7000);
+
+
 
   //inizializza la sim
   sim800.println("AT+CMGF=1");        // Modalità testo

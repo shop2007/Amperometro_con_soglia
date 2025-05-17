@@ -10,11 +10,11 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 
 //********************************************************************************************
 // PIN di accesso via SMS
-#define PinUtente1 "11111"
-#define PinUtente2 "22222"
-#define PinDati    "12345"
-#define PinReset   "88888"
-#define DeleteUtente2 "00002"
+#define PinUtente1 "User1"
+#define PinUtente2 "User2"
+#define PinDati    "Statoattuale"
+#define PinReset   "Resetsystem"
+#define DeleteUtente2 "eleteuser2"
 
 //********************************************************************************************
 // EEPROM indirizzi Numeri telefonici UTENTE1 UTENTE2 in EEPROM
