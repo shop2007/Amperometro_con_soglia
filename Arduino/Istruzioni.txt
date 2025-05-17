@@ -4,7 +4,7 @@ Quando manda sms o lo riceve, accende il led bianco
 
 
 file amp_sog_19_sms10
-Comandi da inviare via SMS da qualsiasi telefono (attento alle Maiuscole-Minuscole). Riceve SMS di risposta "Utentex registrato correttamente"
+Comandi da inviare via SMS da qualsiasi telefono (attento alle Maiuscole-Minuscole).
 User1 - mette il numero ricevuto come utente principale da avvisare su allarmi. Riceve SMS di risposta "Utentex registrato correttamente"
 User2 - mette il numero ricevuto come utente 2 da avvisare su allarmi
 Statoattuale  - trasmette i valori sul display in quel momento 
